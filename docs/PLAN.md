@@ -26,6 +26,7 @@ Append-only. Every execution session adds a row. Rows are never edited or delete
 | 1.1 | 2026-09-07 | S0, S12a, S19a, S29a, S29b, S35a, S50a added; S20/S22/S29/S35/S37/S40/S41/S50 amended; D8–D9 + O1–O2 ratified | End-to-end gap audit folded in: edge layer, geolocation enforcement, national self-exclusion registers, explicit age gate, player-funds segregation, per-market game-certification registry, trader operations, player helpdesk, alert authoring/on-call, deferred-adapter conformance in CI, licensing procurement register, IBIA/ESSA + ADR-provider membership, first-market open decision, timeline stretched to a 20–30 month envelope for a 10–15 engineer team. |
 | 1.2 | 2026-09-07 | S4a, S28a added; S4/S5/S30/S35/S45/S48 amended; D10 ratified | Residual implementation audit folded in: deployment pipeline (per-service Dockerfiles, Helm charts, Argo CD gitops — previously unowned by any step), SCA/dependency scanning in CI + external penetration test as an MGA licensing-gate deliverable, ADR-0008 stance for GDPR right-to-erasure vs append-only evidence (pseudonymization at closure), staging environment provisioning (M2/M3/M4 gates all referenced a staging that no step built), affordability/financial-risk checks, and RNG key custody (HSM/KMS-class — Vault dev-mode will not satisfy cert labs). |
 | 1.3 | 2026-09-07 | S0 | Plan promoted to `docs/PLAN.md` as the single living doc; `.opencode/plans` working copy retired. Phase 0 execution begins. |
+| 1.4 | 2026-09-07 | S1–S6 ☑, S7 ◐ | Phase 0 executed: initial commit on `main` (aa72d0f), repo private at `echelonxventures-Projects/Satta` + pushed, pre-commit active + all-files clean, `buf breaking` baselined, CI workflow written (S4) + SCA, ADR-0006 Accepted/0007 written/0002 pointer/0008 drafted, state + decisions log updated. Pre-existing defects found & fixed (Taskfile YAML parse bug, 82 lint findings, schema_migration owner-version collision). **S7 blocked GitHub-side**: Actions silently suppressed on the flagged account (0 runs despite admin + workflow scope); branch protection requires GitHub Pro. Follow-ups: GitHub Support contact for Actions; Pro upgrade or public repo for rulesets (staged JSON). All local gates green: build, 0 lint issues, 14/14 invariants, unit + integration tests. |
 
 ## Step status convention
 
@@ -112,14 +113,14 @@ Absorbed into the sequence below:
 | Step | Status | Work |
 |------|--------|------|
 | S0 | ☑ [v1.3] | **v1.1:** Promote this plan to `docs/PLAN.md` (single living doc); retire the `.opencode/plans` copy; record the promotion in the Upgrade Log |
-| S1 | ☐ | Initial commit on `main` (before hooks install, so `no-commit-to-branch` cannot block it) |
-| S2 | ☐ | `gh repo create satta --private` + push + branch protection on `main` via rulesets |
-| S3 | ☐ | `pipx install pre-commit` → `pre-commit install` → `run --all-files` → baseline `task breaking` |
-| S4 | ☐ | `.github/workflows/ci.yml` mirroring `task ci`: build → lint (go + proto + invariants) → unit → integration with local substrate. **v1.2 (G14):** + SCA/dependency-scanning stage in CI (gosec already lint-local; add govulncheck-class dependency scan) — supply-chain hygiene from the first commit, not retrofitted |
+| S1 | ☑ [v1.4] | Initial commit on `main` (before hooks install, so `no-commit-to-branch` cannot block it) |
+| S2 | ◐ [v1.4] | `gh repo create satta --private` + push + branch protection on `main` via rulesets — push ✓, tracking ✓; ruleset staged but requires GitHub Pro on private repos |
+| S3 | ☑ [v1.4] | `pipx install pre-commit` → `pre-commit install` → `run --all-files` → baseline `task breaking` |
+| S4 | ☑ [v1.4] | `.github/workflows/ci.yml` mirroring `task ci`: build → lint (go + proto + invariants) → unit → integration with local substrate. **v1.2 (G14):** + SCA/dependency-scanning stage in CI (gosec already lint-local; add govulncheck-class dependency scan) — supply-chain hygiene from the first commit, not retrofitted |
 | S4a | ☐ | **v1.2 (G13):** Deployment pipeline: per-service Dockerfile + Helm chart + Argo CD app-of-apps on k3s (per ADR-0003), starting with the S12 service template — deployability proven at M1, not discovered at S51. GHCR images published from CI. Owned by SRE pod; grows one chart per service thereafter |
-| S5 | ☐ | ADR-0006 → Accepted (Stage 4); write ADR-0007 (supersedes ADR-0002 cost mandate); add superseded-pointer to ADR-0002. **v1.2 (G15):** + draft ADR-0008 — GDPR right-to-erasure vs append-only evidence stance (pseudonymization-at-closure: evidence records persist; PII fields are crypto-pseudonymized on account closure; stance validated with counsel per market under O1)** — drafted here, decided with the first-market counsel pass |
-| S6 | ☐ | Update `implementation-state.md` (blockers cleared; Next Up resequenced; toolchain line) |
-| S7 | ☐ | Commit, push, `gh run watch` green — **Phase 0 exit gate** |
+| S5 | ☑ [v1.4] | ADR-0006 → Accepted (Stage 4); write ADR-0007 (supersedes ADR-0002 cost mandate); add superseded-pointer to ADR-0002. **v1.2 (G15):** + draft ADR-0008 — GDPR right-to-erasure vs append-only evidence stance (pseudonymization-at-closure: evidence records persist; PII fields are crypto-pseudonymized on account closure; stance validated with counsel per market under O1)** — drafted here, decided with the first-market counsel pass |
+| S6 | ☑ [v1.4] | Update `implementation-state.md` (blockers cleared; Next Up resequenced; toolchain line) |
+| S7 | ◐ [v1.4] | Commit, push, `gh run watch` green — **Phase 0 exit gate**. Push ✓ (branch `phase-0/foundation-unblock`, commit 9942357); CI never triggered — GitHub-side Actions suppression on the flagged account (0 runs, 0 workflows visible, despite admin + workflow scope + Actions enabled). Local full gate green (build, lint 0, invariants 14/14, unit + integration). Unblocked via GitHub Support. |
 
 ### Phase 1 — Foundation (Weeks 2–10)
 

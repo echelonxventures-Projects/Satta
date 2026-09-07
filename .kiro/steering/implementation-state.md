@@ -63,6 +63,10 @@ Retrofit required by ADR-0001 (touches code already written):
 
 ## Blockers
 
+- **GitHub Actions silently suppressed on this account's repos** (GitHub-side flag from
+  the earlier "repository is disabled" 403; pushes work, Actions do not fire — 0 runs,
+  0 workflows visible via API despite admin + workflow scope and Actions enabled).
+  Contact GitHub Support; until resolved, the CI workflow file is in place but inert.
 - **Branch protection requires GitHub Pro** (private repo). Ruleset JSON staged at
   `/var/folders/sg/wcc5mm0d0hncgvmbdf5sp0l00000gp/T/opencode/ruleset.json`; apply via
   `gh api -X POST repos/echelonxventures-Projects/Satta/rulesets --input <file>` once
@@ -72,11 +76,10 @@ Retrofit required by ADR-0001 (touches code already written):
   non-Go implementations. Build them before Task 2. Sequencing, not a defect — but it
   compounds if ignored. **Next up (S8).**
 - **ADR-0008 is Proposed.** Decide with first-market counsel (plan O1) before M4.
-- **Steering conflicts with the cost mandate, resolved but text stale.** `project-context.md`
-  and `delivery-realities.md` still read as current-state enterprise scale; ADR-0002's
-  mandate is superseded by ADR-0007. Reconcile by pointing both at ADR-0007 + `docs/PLAN.md`.
 - **Task 37 / 46 scope overlap.** Both claim the partner self-service portal; 37 is L, 46 is
   R. ADR-0005 treats it as R pending confirmation (plan S44).
+- **`task verify-evidence` needs chains to verify** — currently "no evidence chains found"
+  on a fresh volume; expected until first append. Not a defect.
 
 ## Key Files & Paths
 
