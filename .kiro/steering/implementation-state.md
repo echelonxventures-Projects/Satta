@@ -12,6 +12,12 @@ now have ADRs with Status fields. Keep this file to state.
 ## Completed Tasks
 
 - **Setup**: Project steering files and automation hooks established (2026-07-31)
+- **Phase 0 executed (2026-09-07)** per `docs/PLAN.md` v1.3: plan promoted to
+  `docs/PLAN.md` (S0); initial commit on `main` + private GitHub remote
+  `echelonxventures-Projects/Satta` + push (S1–S2); pre-commit installed and
+  `run --all-files` clean, `buf breaking` baselined (S3); CI workflow
+  `.github/workflows/ci.yml` mirroring `task ci` + govulncheck SCA (S4); ADR-0006
+  accepted Stage 4, ADR-0007 written, ADR-0002 pointer, ADR-0008 drafted (S5)
 
 ## In Progress
 
@@ -57,23 +63,20 @@ Retrofit required by ADR-0001 (touches code already written):
 
 ## Blockers
 
+- **Branch protection requires GitHub Pro** (private repo). Ruleset JSON staged at
+  `/var/folders/sg/wcc5mm0d0hncgvmbdf5sp0l00000gp/T/opencode/ruleset.json`; apply via
+  `gh api -X POST repos/echelonxventures-Projects/Satta/rulesets --input <file>` once
+  upgraded, or make the repo public. Follow-up, not a blocker to code.
 - **Conformance suites gate further service work.** Any service written before the
   wire-level suites exist needs retrofitting, since in-process Go tests cannot validate
   non-Go implementations. Build them before Task 2. Sequencing, not a defect — but it
-  compounds if ignored.
-- **ADR-0006 (launch stage) is Proposed, not Accepted.** Phase 1 is identical under all four
-  options so foundation work proceeds. **Do not start Tasks 10, 11, 12, 14 or 42 until it is
-  decided** — under stages 1-2 they are not launch-critical and the roadmap L/R tagging
-  needs rewriting.
-- **Not a git repository.** `git rev-parse` fails, which blocks `pre-commit install` and
-  `task breaking` (`buf breaking --against '../.git#subdir=proto'`).
-- **`pre-commit` not installed** (`pipx install pre-commit`). Config written, no hooks active.
-- **Steering conflicts with the cost mandate, unreconciled.** `project-context.md` requires
-  enterprise scale and zero downtime; `delivery-realities.md` assumes 25-40 engineers.
-  ADR-0002 resolves this as a stage-0 topology with the target architecture intact, but the
-  two steering files still read as current-state. Reconcile by pointing them at ADR-0002.
+  compounds if ignored. **Next up (S8).**
+- **ADR-0008 is Proposed.** Decide with first-market counsel (plan O1) before M4.
+- **Steering conflicts with the cost mandate, resolved but text stale.** `project-context.md`
+  and `delivery-realities.md` still read as current-state enterprise scale; ADR-0002's
+  mandate is superseded by ADR-0007. Reconcile by pointing both at ADR-0007 + `docs/PLAN.md`.
 - **Task 37 / 46 scope overlap.** Both claim the partner self-service portal; 37 is L, 46 is
-  R. ADR-0005 treats it as R pending confirmation.
+  R. ADR-0005 treats it as R pending confirmation (plan S44).
 
 ## Key Files & Paths
 
@@ -100,23 +103,22 @@ Retrofit required by ADR-0001 (touches code already written):
 
 go 1.26.5 darwin/arm64 · task 3.52.0 · golangci-lint 2.12.2 · buf 1.72.0 ·
 protoc-gen-go 1.36.6 · protoc-gen-go-grpc 1.5.1 · Docker 27.5.1 / Compose 2.32.4 ·
-**pre-commit missing**
+pre-commit 4.x (installed 2026-09-07, hooks active)
 
 ## Next Up
 
-1. `git init` and initial commit — unblocks pre-commit and buf breaking
-2. `scripts/check-invariants.sh` and `check-state-freshness.sh`
-3. `buf generate` into `libs/go/gen`
-4. Local substrate compose file, tiered per ADR-0002
-5. `cmd/platformctl` — migrate, seed, verify-evidence
-6. Go service template: observability, httpx middleware, bootstrap, `services/template`
-7. Postgres metering emitter and `EmitTx`
-8. Golden test vectors
-9. Wire-level conformance suite, then the ADR-0001 retrofits
-10. `apps/` + `packages/` scaffold with generated `api-client`
-11. Reconcile steering with ADR-0002; confirm Task 37/46 boundary
-12. Walk all 10 Definition of Done gates before marking Task 1 complete
-13. Then Task 2 — workflow orchestration, Temporal behind a port
+1. ~~`git init` and initial commit~~ — done 2026-09-07 (Phase 0, S1–S3)
+2. S8 — Wire-level gRPC conformance suite for `evidencetest` (hard gate before any service)
+3. S9 — ADR-0001 retrofits (optimistic concurrency; trigger/RLS demotion; INSERT-only grant conformance)
+4. S10 — Golden test vectors (money / ratio / rounding / hash pre-image)
+5. S11 — Tests for the 10 untested packages + Postgres integration suite
+6. S4a — Deployment pipeline (Dockerfile + Helm + Argo CD) with the S12 service template
+7. S12 — Go service template: observability, httpx middleware, bootstrap, `services/template`
+8. Postgres metering emitter durability follow-up; golden vectors; `apps/`+`packages/` scaffold (S13)
+9. Reconcile steering docs with ADR-0007; confirm Task 37/46 boundary (S44)
+10. Then Task 2 — workflow orchestration, Temporal behind a port (S15)
+
+**Master sequence:** `docs/PLAN.md` (S0–S52, now in execution; Phase 0 complete).
 
 ## Notes
 

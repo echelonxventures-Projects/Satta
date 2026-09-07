@@ -181,7 +181,7 @@ tasks:
     cmds:
       - go test -race -count=1 -coverprofile=coverage.out {{.GO_PACKAGES}}
       - go tool cover -html=coverage.out -o coverage.html
-      - cmd: echo "coverage report: coverage.html"
+      - cmd: 'echo "coverage report: coverage.html"'
         silent: true
 
   lint:
@@ -210,8 +210,10 @@ tasks:
   fmt:
     desc: Format Go and protobuf sources
     cmds:
-      - gofmt -w -s libs cmd services
-      - go run golang.org/x/tools/cmd/goimports@v0.30.0 -w -local github.com/satta/platform libs cmd services
+      # Directories that arrive later (services, apps) are tolerated so the
+      # task works at every phase of the roadmap.
+      - gofmt -w -s $(for d in libs cmd services apps; do [ -d "$d" ] && printf '%s ' "$d"; done)
+      - go run golang.org/x/tools/cmd/goimports@v0.30.0 -w -local github.com/satta/platform $(for d in libs cmd services apps; do [ -d "$d" ] && printf '%s ' "$d"; done)
       - cd proto && buf format --write
 
   tidy:

@@ -90,6 +90,7 @@ func NewRatio(num, den int64) (Ratio, error) {
 func MustRatio(num, den int64) Ratio {
 	r, err := NewRatio(num, den)
 	if err != nil {
+		//nolint:forbidigo // Must* constructors panic by documented contract
 		panic(err)
 	}
 	return r

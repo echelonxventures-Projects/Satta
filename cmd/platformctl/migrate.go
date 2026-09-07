@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io/fs"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/satta/platform/libs/go/db"
 	"github.com/satta/platform/libs/go/evidence"
 	"github.com/satta/platform/libs/go/metering"
@@ -65,7 +67,7 @@ func runMigrate(ctx context.Context, args []string) error {
 
 	total := 0
 	for _, owner := range schemaOwners() {
-		applied, err := db.MigrateFS(ctx, pool, owner.fsys, owner.dir)
+		applied, err := db.MigrateFS(ctx, pool, owner.name, owner.fsys, owner.dir)
 		if err != nil {
 			return fmt.Errorf("%s schema: %w", owner.name, err)
 		}
@@ -130,42 +132,42 @@ func applyGrants(ctx context.Context, pool *db.Pool) error {
 	err = pool.InTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		for _, table := range appendOnlyTables {
 			// SELECT and INSERT only. The absence of UPDATE and DELETE here is the control.
-			if err := execGrant(ctx, tx,
-				`GRANT SELECT, INSERT ON `+table+` TO satta_appender`); err != nil {
-				return err
+			if gerr := execGrant(ctx, tx,
+				`GRANT SELECT, INSERT ON `+table+` TO satta_appender`); gerr != nil {
+				return gerr
 			}
 			// Revoke explicitly rather than relying on never having granted. A previous
 			// migration or a hand-run GRANT ALL would otherwise leave the hole open.
-			if err := execGrant(ctx, tx,
-				`REVOKE UPDATE, DELETE, TRUNCATE ON `+table+` FROM satta_appender, satta_app`); err != nil {
-				return err
+			if gerr := execGrant(ctx, tx,
+				`REVOKE UPDATE, DELETE, TRUNCATE ON `+table+` FROM satta_appender, satta_app`); gerr != nil {
+				return gerr
 			}
-			if err := execGrant(ctx, tx,
-				`GRANT SELECT, INSERT ON `+table+` TO satta_app`); err != nil {
-				return err
+			if gerr := execGrant(ctx, tx,
+				`GRANT SELECT, INSERT ON `+table+` TO satta_app`); gerr != nil {
+				return gerr
 			}
-			if err := execGrant(ctx, tx,
-				`GRANT SELECT ON `+table+` TO satta_auditor`); err != nil {
-				return err
+			if gerr := execGrant(ctx, tx,
+				`GRANT SELECT ON `+table+` TO satta_auditor`); gerr != nil {
+				return gerr
 			}
 			// SAFETY INVARIANT 11: the auditor is read-only at the database layer too.
-			if err := execGrant(ctx, tx,
-				`REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON `+table+` FROM satta_auditor`); err != nil {
-				return err
+			if gerr := execGrant(ctx, tx,
+				`REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON `+table+` FROM satta_auditor`); gerr != nil {
+				return gerr
 			}
 		}
 		for _, table := range mutableTables {
-			if err := execGrant(ctx, tx,
-				`GRANT SELECT, INSERT, UPDATE ON `+table+` TO satta_app, satta_appender`); err != nil {
-				return err
+			if gerr := execGrant(ctx, tx,
+				`GRANT SELECT, INSERT, UPDATE ON `+table+` TO satta_app, satta_appender`); gerr != nil {
+				return gerr
 			}
-			if err := execGrant(ctx, tx,
-				`REVOKE DELETE, TRUNCATE ON `+table+` FROM satta_app, satta_appender`); err != nil {
-				return err
+			if gerr := execGrant(ctx, tx,
+				`REVOKE DELETE, TRUNCATE ON `+table+` FROM satta_app, satta_appender`); gerr != nil {
+				return gerr
 			}
-			if err := execGrant(ctx, tx,
-				`GRANT SELECT ON `+table+` TO satta_auditor`); err != nil {
-				return err
+			if gerr := execGrant(ctx, tx,
+				`GRANT SELECT ON `+table+` TO satta_auditor`); gerr != nil {
+				return gerr
 			}
 		}
 		return nil
@@ -224,6 +226,7 @@ func missingRoles(ctx context.Context, pool *db.Pool) ([]string, error) {
 
 func reportStatus(ctx context.Context, pool *db.Pool) error {
 	type record struct {
+		owner     string
 		version   int
 		name      string
 		appliedAt time.Time
@@ -232,7 +235,7 @@ func reportStatus(ctx context.Context, pool *db.Pool) error {
 	var applied []record
 	err := pool.InTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
-			`SELECT version, name, applied_at FROM schema_migration ORDER BY version`)
+			`SELECT owner, version, name, applied_at FROM schema_migration ORDER BY owner, version`)
 		if err != nil {
 			if isUndefinedTable(err) {
 				return nil // Nothing has ever been applied.
@@ -242,7 +245,7 @@ func reportStatus(ctx context.Context, pool *db.Pool) error {
 		defer rows.Close()
 		for rows.Next() {
 			var r record
-			if err := rows.Scan(&r.version, &r.name, &r.appliedAt); err != nil {
+			if err := rows.Scan(&r.owner, &r.version, &r.name, &r.appliedAt); err != nil {
 				return err
 			}
 			applied = append(applied, r)
@@ -253,9 +256,9 @@ func reportStatus(ctx context.Context, pool *db.Pool) error {
 		return fmt.Errorf("read migration status: %w", err)
 	}
 
-	appliedByVersion := make(map[int]record, len(applied))
+	appliedByKey := make(map[string]record, len(applied))
 	for _, r := range applied {
-		appliedByVersion[r.version] = r
+		appliedByKey[r.owner+"#"+strconv.Itoa(r.version)] = r
 	}
 
 	fmt.Printf("%-10s  %-8s  %-28s  %s\n", "OWNER", "VERSION", "NAME", "APPLIED (UTC)")
@@ -266,7 +269,7 @@ func reportStatus(ctx context.Context, pool *db.Pool) error {
 			return fmt.Errorf("%s schema: %w", owner.name, err)
 		}
 		for _, m := range migrations {
-			if r, ok := appliedByVersion[m.Version]; ok {
+			if r, ok := appliedByKey[owner.name+"#"+strconv.Itoa(m.Version)]; ok {
 				fmt.Printf("%-10s  %04d      %-28s  %s\n",
 					owner.name, m.Version, m.Name, r.appliedAt.UTC().Format(time.RFC3339))
 				continue

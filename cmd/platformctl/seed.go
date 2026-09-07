@@ -71,14 +71,17 @@ func runSeed(ctx context.Context, args []string) error {
 		JurisdictionCode: "mt",
 		RegionCode:       "eu-west",
 	}
-	if err := config.Require(ctx, resolver, scope, requiredLocalKeys...); err != nil {
-		return err
+	if rerr := config.Require(ctx, resolver, scope, requiredLocalKeys...); rerr != nil {
+		return rerr
 	}
 
 	keys := resolver.Keys()
 	sort.Strings(keys)
 
-	abs, _ := filepath.Abs(*policyPath)
+	abs, err := filepath.Abs(*policyPath)
+	if err != nil {
+		return fmt.Errorf("resolve policy path: %w", err)
+	}
 	fmt.Printf("policy loaded from %s\n", abs)
 	fmt.Printf("  version   %s (content hash)\n", version)
 	fmt.Printf("  keys      %d defined, %d required and present\n", len(keys), len(requiredLocalKeys))

@@ -71,15 +71,19 @@ func main() {
 		return
 	default:
 		fmt.Fprintf(os.Stderr, "platformctl: unknown command %q\n\n%s", os.Args[1], usage)
+		stop()
+		//nolint:gocritic // exitAfterDefer: stop() has run explicitly above
 		os.Exit(2)
 	}
 
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			fmt.Fprintln(os.Stderr, "platformctl: cancelled")
+			stop()
 			os.Exit(130)
 		}
 		fmt.Fprintf(os.Stderr, "platformctl: %v\n", err)
+		stop()
 		os.Exit(1)
 	}
 }

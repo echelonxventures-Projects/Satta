@@ -22,6 +22,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/satta/platform/libs/go/tenancy"
 )
 
@@ -202,6 +203,7 @@ func (p *Pool) inTx(ctx context.Context, fn func(ctx context.Context, tx pgx.Tx)
 		// Rollback after a successful commit is a no-op, so this is safe as an
 		// unconditional cleanup and removes the need for a rollback call on every
 		// error path.
+		//nolint:errcheck // documented no-op cleanup; commit errors surface above
 		_ = tx.Rollback(ctx)
 	}()
 

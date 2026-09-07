@@ -124,6 +124,7 @@ func WithActor(ctx context.Context, a Actor) (context.Context, error) {
 func MustWithActor(ctx context.Context, a Actor) context.Context {
 	out, err := WithActor(ctx, a)
 	if err != nil {
+		//nolint:forbidigo // Must* constructors panic by documented contract
 		panic(err)
 	}
 	return out

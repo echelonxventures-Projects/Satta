@@ -199,6 +199,7 @@ func WithScope(ctx context.Context, s Scope) (context.Context, error) {
 func MustWithScope(ctx context.Context, s Scope) context.Context {
 	out, err := WithScope(ctx, s)
 	if err != nil {
+		//nolint:forbidigo // Must* constructors panic by documented contract
 		panic(err)
 	}
 	return out

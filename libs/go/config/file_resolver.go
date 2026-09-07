@@ -9,8 +9,9 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/satta/platform/libs/go/tenancy"
 	"gopkg.in/yaml.v3"
+
+	"github.com/satta/platform/libs/go/tenancy"
 )
 
 // FileResolver is a Resolver backed by a YAML document of configuration layers.

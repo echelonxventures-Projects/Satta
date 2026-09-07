@@ -27,7 +27,9 @@ works the way it does.
 | [0003](0003-container-runtime.md) | Podman locally, single-node k3s in production | Accepted |
 | [0004](0004-deferred-components.md) | Deferred components are values-file bindings, not deletions | Accepted |
 | [0005](0005-frontend-architecture.md) | One repo, thin apps, fat shared packages | Accepted |
-| [0006](0006-launch-stage.md) | Launch stage and product legality | **Proposed** |
+| [0006](0006-launch-stage.md) | Launch stage and product legality | **Accepted** (Stage 4, 2026-09-07) |
+| [0007](0007-production-cost-posture.md) | Production cost posture supersedes ADR-0002 budget mandate | Accepted |
+| [0008](0008-gdpr-erasure-vs-evidence.md) | GDPR right-to-erasure vs append-only evidence (pseudonymization-at-closure) | Proposed |
 
 ## Decisions already documented in code
 
