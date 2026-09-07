@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Validate steering file changes",
+      "trigger": "PostFileSave",
+      "description": "Validates that changes to steering files are additive and consistent — new context extends rather than contradicts existing decisions, invariants, and implementation state. Ensures decisions-log entries follow the append-only format.",
+      "matcher": "\\.kiro/steering/.*\\.md$",
+      "action": {
+        "type": "agent",
+        "prompt": "A steering file was just saved. Check the following:\n1. If decisions-log.md was modified, verify the new entry follows the DECISION-{number} format and has all required fields (Date, Context, Decision, Impact, Status). Warn if an existing decision was edited rather than appended.\n2. If implementation-state.md was modified, verify tasks moved correctly between sections (Next Up → In Progress → Completed) and no completed tasks were removed.\n3. If any other steering file was modified, check that it does not contradict the safety-invariants.md (the 12 hard invariants) or remove existing requirements from project-context.md.\n4. Confirm the change is additive/non-breaking — new context should extend, not conflict with, existing implementation work.\nIf any issue is found, report it clearly. Otherwise confirm the steering update is consistent."
+      }
+    }
+  ]
+}

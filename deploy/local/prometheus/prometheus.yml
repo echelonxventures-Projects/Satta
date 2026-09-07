@@ -1,0 +1,45 @@
+# Local Prometheus configuration.
+#
+# Scrape targets use host.docker.internal so that services running on the host — the normal
+# way to develop, with `go run` — are reachable from inside the container. Services running
+# inside the substrate are reachable by their compose service name.
+#
+# Definition of Done gate 4 requires every service to emit Prometheus metrics, so a new
+# service should be added here at the same time it gets its metrics endpoint. A service whose
+# metrics nothing scrapes is a service with no metrics.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: local
+    region: local
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Platform services running on the host. Add a target per service; a target that is down
+  # shows as such rather than breaking the scrape config, so unbuilt services are harmless.
+  - job_name: platform-services
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "host.docker.internal:8080"   # services/template
+        labels:
+          service: template
+          tier: application
+
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres:5432"]
+    # No exporter yet. Kept so the intent is visible; postgres_exporter is a later addition.
+    honor_labels: true
+
+  - job_name: temporal
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["temporal:9090"]
+        labels:
+          tier: workflow

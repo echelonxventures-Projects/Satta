@@ -1,0 +1,53 @@
+# Local Tempo. Receives OTLP over gRPC (4317) and HTTP (4318).
+#
+# Traces are sampled and short-lived by design. This is exactly why libs/go/correlation
+# exists separately: a correlation ID has to survive in audit records and usage events for
+# years, and a trace ID does not survive past this retention window.
+
+server:
+  http_listen_port: 3200
+  log_level: warn
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+ingester:
+  max_block_duration: 5m
+
+compactor:
+  compaction:
+    block_retention: 24h
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+# Generate RED metrics from spans so latency and error rate are visible in Grafana without
+# every service having to hand-instrument them.
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
+
+usage_report:
+  reporting_enabled: false

@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package platform.metering.v1;
+
+import "google/protobuf/timestamp.proto";
+import "platform/common/v1/tenant.proto";
+
+// UsageEvent is the record of one billable action.
+//
+// Every capability in the platform is independently sellable, so every billable
+// action emits exactly one of these with a caller-supplied idempotency key.
+//
+// SAFETY INVARIANT 7: once a usage record has been rated it is immutable, and
+// nothing in the billing path may post to the gaming ledger. This message
+// therefore carries a quantity and dimensions only — never a monetary amount
+// and never a ledger account reference. Pricing is applied downstream by the
+// rating engine, which writes to billing accounts exclusively.
+message UsageEvent {
+  // Globally unique event identifier, and the idempotency key for ingestion.
+  // Re-submitting the same event_id is a no-op that returns the original
+  // outcome.
+  string event_id = 1;
+
+  // Who the usage is attributed to for billing.
+  platform.common.v1.TenantScope scope = 2;
+
+  // Product from the product/SKU registry that this usage belongs to.
+  string product_code = 3;
+
+  // Meter within the product, e.g. a per-bet meter or a per-active-player
+  // meter. Registry-driven; services never invent meter codes inline.
+  string meter_code = 4;
+
+  // Integer quantity in units of `unit`. Fractional usage is expressed by
+  // choosing a finer unit, never by a floating-point quantity.
+  int64 quantity = 5;
+
+  // Unit of measure key from the registry, e.g. "count", "byte", "millisecond".
+  string unit = 6;
+
+  // When the metered action occurred. UTC (SAFETY INVARIANT 12). Determines
+  // which billing period the usage falls into.
+  google.protobuf.Timestamp occurred_at = 7;
+
+  // Free-form billing dimensions used for rating and for tenant-facing usage
+  // breakdowns, e.g. channel, vertical, region. Keys are registry-controlled.
+  map<string, string> dimensions = 8;
+
+  // Emitting service and version, for provenance during billing disputes.
+  string source_service = 9;
+  string source_version = 10;
+
+  // Correlation back to the originating request.
+  string correlation_id = 11;
+
+  // Identifier of the domain object that caused the usage (bet id, session id,
+  // API request id). Enables reconciliation of invoices against operations.
+  string subject_type = 12;
+  string subject_id = 13;
+}
+
+// MeteringIngestService accepts usage events. There is deliberately no update
+// or delete RPC.
+service MeteringIngestService {
+  rpc Ingest(IngestRequest) returns (IngestResponse);
+  rpc IngestBatch(IngestBatchRequest) returns (IngestBatchResponse);
+}
+
+message IngestRequest {
+  UsageEvent event = 1;
+}
+
+message IngestResponse {
+  string event_id = 1;
+  IngestOutcome outcome = 2;
+}
+
+message IngestBatchRequest {
+  repeated UsageEvent events = 1;
+}
+
+message IngestBatchResponse {
+  repeated IngestResponse results = 1;
+}
+
+enum IngestOutcome {
+  INGEST_OUTCOME_UNSPECIFIED = 0;
+  INGEST_OUTCOME_ACCEPTED = 1;
+  // The event_id was already present; the stored event is authoritative.
+  INGEST_OUTCOME_DUPLICATE = 2;
+  // Accepted for later processing but not yet durable in the usage store.
+  INGEST_OUTCOME_QUEUED = 3;
+}

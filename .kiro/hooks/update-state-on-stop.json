@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Update implementation state before session ends",
+      "trigger": "Stop",
+      "description": "Reminds to update implementation-state.md with progress before the session ends, keeping the state file current for the next session.",
+      "action": {
+        "type": "agent",
+        "prompt": "Before this session ends, update .kiro/steering/implementation-state.md to reflect:\n- Any tasks that moved from \"Next Up\" to \"In Progress\" or \"Completed\"\n- Any new files/paths created during this session added to \"Key Files & Paths Created\"\n- Any new blockers discovered\n- Update \"Current Phase\" if a phase boundary was crossed\nThis ensures the next session picks up exactly where this one left off."
+      }
+    }
+  ]
+}

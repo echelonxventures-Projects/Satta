@@ -1,0 +1,176 @@
+syntax = "proto3";
+
+package platform.audit.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "platform/common/v1/tenant.proto";
+
+// EvidenceService is the append-only, tamper-evident record of every state
+// change touching money, identity or compliance.
+//
+// SAFETY INVARIANT 4: records are hash-chained and there is no deletion or
+// mutation RPC on this service — not for operators, not for platform staff,
+// not for tenants. Absence of a delete path is structural, not a permission
+// setting.
+//
+// SAFETY INVARIANT 11: auditor principals may call the read and verify RPCs
+// only. Append is restricted to service principals.
+service EvidenceService {
+  // Append adds a record to a chain and returns its assigned position and
+  // hash. Idempotent on (chain_id, idempotency_key).
+  rpc Append(AppendRequest) returns (AppendResponse);
+
+  // AppendBatch appends multiple records to the same chain atomically and in
+  // the given order.
+  rpc AppendBatch(AppendBatchRequest) returns (AppendBatchResponse);
+
+  // Get returns a single record by chain and sequence.
+  rpc Get(GetRequest) returns (GetResponse);
+
+  // Verify recomputes the hash chain over a sequence range and reports the
+  // first inconsistency, if any.
+  rpc Verify(VerifyRequest) returns (VerifyResponse);
+
+  // GetChainHead returns the current head sequence and hash for a chain, which
+  // is what external notarisation and checkpointing anchor to.
+  rpc GetChainHead(GetChainHeadRequest) returns (GetChainHeadResponse);
+}
+
+// EvidenceRecord is one immutable entry in a hash chain.
+message EvidenceRecord {
+  // Chain the record belongs to. Chains are partitioned so that a single
+  // tenant's volume never serialises behind another's.
+  string chain_id = 1;
+
+  // Monotonic position within `chain_id`, starting at 1. Assigned by the
+  // server; ignored on append.
+  uint64 sequence = 2;
+
+  platform.common.v1.TenantScope scope = 3;
+
+  // When the recorded event actually happened.
+  //
+  // SAFETY INVARIANT 12: always UTC. Display timezone is a presentation
+  // concern and is never stored here.
+  google.protobuf.Timestamp occurred_at = 4;
+
+  // When the platform durably recorded it. Server-assigned.
+  google.protobuf.Timestamp recorded_at = 5;
+
+  // Coarse classification used for retention and access control.
+  EvidenceCategory category = 6;
+
+  // Dotted action name, e.g. "ledger.transfer.posted" or
+  // "rg.self_exclusion.applied". Registry-driven, not free text.
+  string action = 7;
+
+  // Entity the action was performed on.
+  string subject_type = 8;
+  string subject_id = 9;
+
+  // Principal responsible for the action.
+  platform.common.v1.Actor actor = 10;
+
+  // Structured detail. Must not contain secrets or raw payment instrument
+  // data; identity documents are referenced by handle, never embedded.
+  google.protobuf.Struct payload = 11;
+
+  // SHA-256 over the canonical encoding of `payload`.
+  bytes payload_hash = 12;
+
+  // `record_hash` of the preceding record in the chain. All zero for the
+  // first record.
+  bytes prev_hash = 13;
+
+  // SHA-256 over the canonical encoding of this record's identity fields plus
+  // `payload_hash` and `prev_hash`.
+  bytes record_hash = 14;
+
+  // Caller-supplied de-duplication key, unique within the chain.
+  string idempotency_key = 15;
+
+  // Retention class key resolved from policy at write time. Determines the
+  // earliest date at which lifecycle processing may consider the record, and
+  // is itself part of the record — so retention cannot be shortened after the
+  // fact without breaking the chain.
+  string retention_class = 16;
+
+  // Correlation identifiers linking this record to the originating request and
+  // trace.
+  string correlation_id = 17;
+  string trace_id = 18;
+}
+
+enum EvidenceCategory {
+  EVIDENCE_CATEGORY_UNSPECIFIED = 0;
+  EVIDENCE_CATEGORY_MONEY = 1;
+  EVIDENCE_CATEGORY_IDENTITY = 2;
+  EVIDENCE_CATEGORY_COMPLIANCE = 3;
+  EVIDENCE_CATEGORY_RESPONSIBLE_GAMBLING = 4;
+  EVIDENCE_CATEGORY_SECURITY = 5;
+  EVIDENCE_CATEGORY_GAMEPLAY = 6;
+  EVIDENCE_CATEGORY_CONFIGURATION = 7;
+  EVIDENCE_CATEGORY_COMMERCIAL = 8;
+}
+
+message AppendRequest {
+  // Server assigns sequence, recorded_at, prev_hash and record_hash; those
+  // fields are ignored if set by the caller.
+  EvidenceRecord record = 1;
+}
+
+message AppendResponse {
+  uint64 sequence = 1;
+  bytes record_hash = 2;
+  // True when an existing record was returned because the idempotency key had
+  // already been used.
+  bool deduplicated = 3;
+}
+
+message AppendBatchRequest {
+  string chain_id = 1;
+  repeated EvidenceRecord records = 2;
+}
+
+message AppendBatchResponse {
+  repeated AppendResponse results = 1;
+}
+
+message GetRequest {
+  string chain_id = 1;
+  uint64 sequence = 2;
+}
+
+message GetResponse {
+  EvidenceRecord record = 1;
+}
+
+message VerifyRequest {
+  string chain_id = 1;
+  // Inclusive range. from_sequence of 0 is treated as 1; to_sequence of 0 is
+  // treated as the current head.
+  uint64 from_sequence = 2;
+  uint64 to_sequence = 3;
+}
+
+message VerifyResponse {
+  bool intact = 1;
+  uint64 records_checked = 2;
+  // Populated only when `intact` is false.
+  uint64 first_bad_sequence = 3;
+  string failure_reason = 4;
+  // Head hash observed at the end of the verified range.
+  bytes head_hash = 5;
+}
+
+message GetChainHeadRequest {
+  string chain_id = 1;
+}
+
+message GetChainHeadResponse {
+  string chain_id = 1;
+  uint64 sequence = 2;
+  bytes head_hash = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}

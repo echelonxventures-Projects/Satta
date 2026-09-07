@@ -1,0 +1,45 @@
+# Build output
+/bin/
+/dist/
+/out/
+*.test
+*.out
+
+# Go
+vendor/
+/coverage.out
+/coverage.html
+
+# Rust
+target/
+
+# Node
+node_modules/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# Local environment
+.env
+.env.*
+!.env.example
+/.local/
+/deploy/local/data/
+
+# Editors / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Secrets — never commit
+*.pem
+*.key
+!**/testdata/**/*.pem
+!**/testdata/**/*.key
+secrets.yaml
+secrets.yml
+
+# Office lock/temp files
+~$*

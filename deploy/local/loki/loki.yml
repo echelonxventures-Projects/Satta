@@ -1,0 +1,60 @@
+# Local Loki. Single-binary, filesystem-backed, no clustering.
+#
+# Retention is 72h locally. That is a development convenience and bears no relationship to
+# the platform's actual log retention obligations, which are jurisdiction-specific policy
+# resolved through the config engine and enforced by the log governance work in Task 43.
+# Nothing here should be copied into a production configuration.
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  retention_period: 72h
+  # Local services can produce bursts during load simulation (Task 5). Raised so that a
+  # simulation run does not silently drop the logs you were running it to read.
+  ingestion_rate_mb: 32
+  ingestion_burst_size_mb: 64
+  max_query_series: 10000
+  reject_old_samples: true
+  reject_old_samples_max_age: 72h
+  allow_structured_metadata: true
+
+compactor:
+  working_directory: /loki/compactor
+  retention_enabled: true
+  delete_request_store: filesystem
+
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+
+analytics:
+  reporting_enabled: false

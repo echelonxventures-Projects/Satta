@@ -1,0 +1,105 @@
+# Pre-commit hooks. Install with:
+#
+#   pipx install pre-commit && pre-commit install
+#
+# These are a fast subset of `task ci`, chosen to catch what is cheap to catch
+# before a commit exists. They are not a substitute for CI: the substrate-backed
+# integration suite is too slow for a commit hook, and a hook that developers
+# routinely bypass with --no-verify enforces nothing.
+#
+# The safety-invariant check is the one hook here that is not about style. It runs
+# on every commit because an invariant breach is much cheaper to reject than to
+# unwind after it has shipped.
+minimum_pre_commit_version: "3.5.0"
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-symlinks
+      - id: destroyed-symlinks
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+        # Taskfile and Compose use templating that the strict YAML loader rejects.
+        exclude: ^(Taskfile\.yml|deploy/local/docker-compose\.yml)$
+      - id: check-json
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: detect-private-key
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, master]
+
+  - repo: local
+    hooks:
+      - id: gofmt
+        name: gofmt
+        entry: gofmt -l -s
+        language: system
+        types: [go]
+        # gofmt -l lists offenders without changing them; a non-empty list is the
+        # failure. The `entry` output is what the developer sees.
+        pass_filenames: true
+
+      - id: go-vet
+        name: go vet
+        entry: go vet ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: go-build
+        name: go build
+        entry: go build ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: go-test-short
+        name: go test (unit)
+        entry: go test -count=1 ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: golangci-lint
+        name: golangci-lint
+        entry: golangci-lint run --new-from-rev=HEAD
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: buf-lint
+        name: buf lint
+        entry: bash -c 'cd proto && buf lint'
+        language: system
+        files: ^proto/.*\.proto$
+        pass_filenames: false
+
+      - id: buf-format
+        name: buf format
+        entry: bash -c 'cd proto && buf format --diff --exit-code'
+        language: system
+        files: ^proto/.*\.proto$
+        pass_filenames: false
+
+      - id: safety-invariants
+        name: safety invariants
+        entry: ./scripts/check-invariants.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: steering-state-reminder
+        name: implementation state is current
+        entry: ./scripts/check-state-freshness.sh
+        language: system
+        pass_filenames: false
+        always_run: true

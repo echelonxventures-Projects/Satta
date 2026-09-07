@@ -1,0 +1,260 @@
+# golangci-lint configuration (schema v2).
+#
+# Most of what is enabled here is ordinary Go hygiene. The parts worth reading are
+# the forbidigo and depguard rules, which encode platform constraints that are
+# otherwise only enforced by review:
+#
+#   - time.Now, math/rand and floating-point money are the three mistakes that are
+#     cheap to make, invisible in review, and expensive in a regulated financial
+#     system. They are blocked at the linter rather than documented.
+#   - Vendor SDKs are blocked from domain packages, so that "every external
+#     dependency behind a port" is a build failure when violated rather than an
+#     aspiration.
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  # Build tags so that integration-tagged files are linted too. Code that only
+  # compiles in CI is code that rots.
+  build-tags:
+    - integration
+
+linters:
+  default: standard
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - contextcheck
+    - copyloopvar
+    - depguard
+    - durationcheck
+    - errname
+    - errorlint
+    - exhaustive
+    - forbidigo
+    - gocheckcompilerdirectives
+    - gochecksumtype
+    - gocritic
+    - goprintffuncname
+    - gosec
+    - makezero
+    - misspell
+    - musttag
+    - nilerr
+    - nilnesserr
+    - noctx
+    - nolintlint
+    - predeclared
+    - reassign
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - testifylint
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - wastedassign
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    exhaustive:
+      # Switches over a domain enum that silently ignore a new member are how a
+      # newly added jurisdiction, wallet type or bet state ends up handled by the
+      # default branch instead of deliberately.
+      default-signifies-exhaustive: true
+
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: '^time\.Now$'
+          msg: >-
+            SAFETY INVARIANT 12 (single time authority): inject clock.Clock and call
+            Now() on it. Reading the wall clock directly makes settlement windows,
+            bonus expiry and self-exclusion boundaries untestable.
+        - pattern: '^time\.Since$'
+          msg: >-
+            Use clock.Clock and subtract explicitly, so that elapsed-time logic is
+            testable at its boundaries.
+        - pattern: '^rand\.'
+          pkg: '^math/rand$'
+          msg: >-
+            math/rand is not a source of randomness for anything player-facing.
+            Game outcomes go through the certified RNG service (SAFETY INVARIANT 2);
+            identifiers and tokens use crypto/rand.
+        - pattern: '^rand\.'
+          pkg: '^math/rand/v2$'
+          msg: >-
+            math/rand/v2 is not a source of randomness for anything player-facing.
+            Game outcomes go through the certified RNG service (SAFETY INVARIANT 2);
+            identifiers and tokens use crypto/rand.
+        - pattern: '^strconv\.ParseFloat$'
+          msg: >-
+            SAFETY INVARIANT 1: money is integer minor units and rates are exact
+            numerator/denominator pairs. Parse into money.Amount or money.Ratio.
+        - pattern: '^fmt\.Print.*$'
+          msg: Use the structured logger; stdout printing is not observable in production.
+        - pattern: '^panic$'
+          msg: >-
+            Return an error. A panic in a money or wagering path aborts a
+            transaction mid-flight and leaves reconciliation to guess what happened.
+            Test helpers and Must* constructors are excluded.
+
+    depguard:
+      rules:
+        # Domain and shared library code may not import infrastructure clients
+        # directly. The port lives in the library; the adapter lives in the
+        # service that owns it.
+        domain-purity:
+          list-mode: lax
+          files:
+            - '**/libs/go/money/**'
+            - '**/libs/go/tenancy/**'
+            - '**/libs/go/identity/**'
+            - '**/libs/go/clock/**'
+            - '**/libs/go/correlation/**'
+          deny:
+            - pkg: github.com/jackc/pgx
+              desc: Core domain primitives must not depend on a database driver.
+            - pkg: github.com/redis
+              desc: Core domain primitives must not depend on a cache client.
+            - pkg: net/http
+              desc: Core domain primitives must not depend on transport.
+        no-deprecated:
+          list-mode: lax
+          files:
+            - $all
+          deny:
+            - pkg: io/ioutil
+              desc: Deprecated; use io and os.
+            - pkg: github.com/golang/protobuf
+              desc: Use google.golang.org/protobuf.
+            - pkg: github.com/pkg/errors
+              desc: Use the standard library errors package with %w.
+            - pkg: math/big
+              desc: >-
+                Money is integer minor units (SAFETY INVARIANT 1). If big.Int seems
+                necessary, the unit is probably wrong. Raise it in review.
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - opinionated
+        - performance
+      disabled-checks:
+        # Named returns are used deliberately in a few places for documentation.
+        - unnamedResult
+        - hugeParam
+
+    gosec:
+      excludes:
+        # G115 (integer conversion overflow) fires on every int64/uint64 sequence
+        # conversion against a bigint column. The relevant bounds are enforced by
+        # database CHECK constraints.
+        - G115
+      config:
+        G306: "0600"
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+
+    misspell:
+      locale: UK
+      ignore-rules:
+        # Domain vocabulary and wire identifiers that are US-spelled by convention.
+        - authorization
+        - authorize
+        - normalize
+        - serialize
+
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - checkPrivateReceivers
+            - disableStutteringCheck
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: indent-error-flow
+        - name: range-val-address
+        - name: time-naming
+        - name: unreachable-code
+        - name: waitgroup-by-value
+
+    staticcheck:
+      checks:
+        - all
+        # ST1000 demands a package comment in a specific form; the packages here
+        # carry longer explanatory comments that it rejects.
+        - -ST1000
+
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # clock is the one package permitted to read the wall clock; that is its
+      # entire purpose.
+      - path: libs/go/clock/clock\.go
+        linters:
+          - forbidigo
+
+      # Test code may panic, print and use fixed randomness.
+      - path: (^|/)(.+)_test\.go
+        linters:
+          - forbidigo
+          - gosec
+          - contextcheck
+          - unparam
+      - path: (^|/)[a-z]+test/
+        linters:
+          - forbidigo
+          - gosec
+          - unparam
+
+      # Must* constructors are documented to panic; that is the contract callers
+      # opt into by choosing the Must variant.
+      - source: '^func Must'
+        linters:
+          - forbidigo
+
+      # SQL is assembled from constant column lists, never from caller input.
+      - path: libs/go/evidence/postgres\.go
+        linters:
+          - gosec
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes:
+        - github.com/satta/platform
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  # New code is held to the full standard. Whole-repo runs stay clean because the
+  # repository is new; there is no legacy exemption to grandfather in.
+  new: false

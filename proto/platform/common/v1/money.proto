@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package platform.common.v1;
+
+// Money is the only permitted wire representation of a monetary value.
+//
+// SAFETY INVARIANT 1 (ledger double-entry / integer-only money arithmetic):
+// money is transported as an integer count of currency minor units. There is
+// deliberately no floating-point field on this message and none may be added.
+// Any arithmetic performed on this value must be integer arithmetic.
+message Money {
+  // Signed quantity expressed in minor units of `currency_code`, scaled by
+  // `scale`. Example: 1234 with currency_code "EUR" and scale 2 is EUR 12.34.
+  int64 minor_units = 1;
+
+  // Currency identifier. ISO 4217 alphabetic code for fiat, or the platform
+  // currency registry key for non-fiat (crypto, bonus, sweeps, gold coins).
+  // Resolution of a code to its scale is registry-driven, never hardcoded in
+  // domain logic.
+  string currency_code = 2;
+
+  // Number of decimal places represented by `minor_units`. Carried explicitly
+  // on the wire so that a reader never has to consult a local table to
+  // interpret the value, and so that a scale mismatch is detectable rather
+  // than silent.
+  uint32 scale = 3;
+}
+
+// Ratio expresses a proportion as an exact integer fraction. Used wherever a
+// rate, share, spread, rake percentage or commission tier would otherwise be
+// tempted into a float.
+message Ratio {
+  int64 numerator = 1;
+  // Must be non-zero.
+  int64 denominator = 2;
+}
+
+// RoundingMode is selected by policy (config/rules engine), never defaulted
+// implicitly inside money arithmetic.
+enum RoundingMode {
+  ROUNDING_MODE_UNSPECIFIED = 0;
+  // Toward zero.
+  ROUNDING_MODE_DOWN = 1;
+  // Away from zero.
+  ROUNDING_MODE_UP = 2;
+  // Toward negative infinity.
+  ROUNDING_MODE_FLOOR = 3;
+  // Toward positive infinity.
+  ROUNDING_MODE_CEIL = 4;
+  // Ties away from zero.
+  ROUNDING_MODE_HALF_UP = 5;
+  // Ties toward zero.
+  ROUNDING_MODE_HALF_DOWN = 6;
+  // Ties to even (banker's rounding).
+  ROUNDING_MODE_HALF_EVEN = 7;
+}

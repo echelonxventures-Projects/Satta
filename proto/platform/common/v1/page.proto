@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package platform.common.v1;
+
+// PageRequest is the standard forward-only cursor pagination request.
+message PageRequest {
+  // Maximum number of items to return. Server clamps to a configured ceiling.
+  uint32 page_size = 1;
+  // Opaque cursor returned by a previous call. Empty starts from the beginning.
+  string page_token = 2;
+}
+
+message PageResponse {
+  // Empty when there are no further pages.
+  string next_page_token = 1;
+}

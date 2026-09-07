@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package platform.common.v1;
+
+// TenantScope identifies the position in the tenancy hierarchy that a request,
+// event or configuration value applies to.
+//
+// Configuration precedence across this hierarchy is: global < jurisdiction <
+// tenant < brand — narrower scopes override wider ones.
+message TenantScope {
+  // Operator/partner tenant identifier. Empty only for platform-global scope.
+  string tenant_id = 1;
+  // Brand within the tenant. Empty means all brands of the tenant.
+  string brand_id = 2;
+  // Regulatory jurisdiction code (registry key, e.g. an ISO 3166 code or a
+  // sub-national licence region key). Empty means jurisdiction-agnostic.
+  string jurisdiction_code = 3;
+  // Deployment region that owns this data, for residency enforcement.
+  string region_code = 4;
+}
+
+// Actor is the authenticated principal responsible for an action. Recorded on
+// every audit event so that no state change is attributable to "the system"
+// without qualification.
+message Actor {
+  ActorType type = 1;
+  // Stable identifier of the principal within `type`.
+  string id = 2;
+  // Human-readable label captured at action time (may become stale; kept for
+  // evidentiary value).
+  string display_name = 3;
+  // Correlated session, where one exists.
+  string session_id = 4;
+  // Source network address, where known.
+  string source_ip = 5;
+}
+
+enum ActorType {
+  ACTOR_TYPE_UNSPECIFIED = 0;
+  ACTOR_TYPE_PLAYER = 1;
+  ACTOR_TYPE_OPERATOR_USER = 2;
+  ACTOR_TYPE_PLATFORM_USER = 3;
+  ACTOR_TYPE_AGENT = 4;
+  ACTOR_TYPE_PARTNER_API_CLIENT = 5;
+  ACTOR_TYPE_SERVICE = 6;
+  ACTOR_TYPE_REGULATOR = 7;
+  ACTOR_TYPE_AUDITOR = 8;
+}

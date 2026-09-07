@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Load implementation state on session start",
+      "trigger": "SessionStart",
+      "description": "On session start, reads implementation-state.md to inform the agent where implementation stands, what's next, and any blockers — so work continues seamlessly without re-asking.",
+      "action": {
+        "type": "agent",
+        "prompt": "At session start, read .kiro/steering/implementation-state.md to understand:\n- Which phase the project is in\n- Which tasks are completed, in progress, or next\n- Any blockers\nUse this to orient yourself before the user asks anything. If the user starts an implementation request, continue from where the state file says we left off. Do not ask the user to re-explain what has already been built."
+      }
+    }
+  ]
+}

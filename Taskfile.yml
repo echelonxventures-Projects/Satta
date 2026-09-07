@@ -1,0 +1,258 @@
+# Taskfile is the single entry point for every repeatable operation in this
+# repository. A Makefile shim delegates to it so that `make up` works as the
+# cross-cutting Definition of Done requires, but the definitions live here.
+#
+# Two rules govern what may be added:
+#
+#   1. Nothing here may require a cloud account, an API key, or network access to
+#      a vendor. The whole platform has to come up on a single developer machine.
+#   2. Anything CI runs must be runnable identically by a developer with one
+#      command. A CI-only script is a script that breaks without anyone noticing.
+version: "3"
+
+vars:
+  COMPOSE_FILE: deploy/local/docker-compose.yml
+  # ADR-0003: Podman and Docker are interchangeable for this substrate. Set
+  # CONTAINER_ENGINE=podman to switch without editing anything.
+  COMPOSE: '{{.CONTAINER_ENGINE | default "docker"}} compose --project-name satta --file deploy/local/docker-compose.yml'
+  # Local substrate credentials. Development-only values for a loopback-bound stack;
+  # production secrets come from Vault. Ports are offset into 5xxxx — see the compose header.
+  POSTGRES_DSN: postgres://satta:satta@127.0.0.1:55432/satta?sslmode=disable
+  GO_PACKAGES: ./...
+
+env:
+  # Every Go tool invocation sees the local substrate, so integration tests need
+  # no per-developer setup beyond `task up`.
+  DATABASE_URL: '{{.POSTGRES_DSN}}'
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list-all
+    silent: true
+
+  # ---------------------------------------------------------------- local stack
+
+  up:
+    desc: Start Tier 1 (Postgres + Redis) and apply migrations
+    cmds:
+      - '{{.COMPOSE}} up --detach --wait --wait-timeout 300'
+      - task: migrate
+      - task: seed
+      - cmd: |
+          echo ""
+          echo "Tier 1 substrate ready (ports offset into 5xxxx to avoid clashing with"
+          echo "anything already running on this machine):"
+          echo "  Postgres     127.0.0.1:55432  (satta/satta, db satta)"
+          echo "  Redis        127.0.0.1:56379"
+          echo ""
+          echo "Tier 2 is opt-in:  task up:bus | up:storage | up:mail | up:secrets"
+          echo "                   task up:analytics | up:search | up:workflow"
+          echo "                   task up:observability | up:full"
+          echo ""
+        silent: true
+
+  # Tier 2 profiles (ADR-0002). Each brings up Tier 1 plus the named profile, so they can be
+  # combined by running more than one. Kept as explicit tasks rather than one task taking a
+  # profile argument, because `task --list` is how a developer discovers what is available.
+
+  up:profile:
+    internal: true
+    cmds:
+      - 'COMPOSE_PROFILES={{.PROFILE}} {{.COMPOSE}} up --detach --wait --wait-timeout 300'
+      - cmd: echo "  {{.PROFILE}} profile up"
+        silent: true
+
+  up:bus:
+    desc: "Tier 2: NATS JetStream event backbone"
+    cmds: [{ task: 'up:profile', vars: { PROFILE: bus } }]
+
+  up:storage:
+    desc: "Tier 2: MinIO S3-compatible object storage"
+    cmds: [{ task: 'up:profile', vars: { PROFILE: storage } }]
+
+  up:mail:
+    desc: "Tier 2: Mailpit SMTP capture"
+    cmds: [{ task: 'up:profile', vars: { PROFILE: mail } }]
+
+  up:secrets:
+    desc: "Tier 2: Vault in dev mode"
+    cmds: [{ task: 'up:profile', vars: { PROFILE: secrets } }]
+
+  up:analytics:
+    desc: "Tier 2: ClickHouse"
+    cmds: [{ task: 'up:profile', vars: { PROFILE: analytics } }]
+
+  up:search:
+    desc: "Tier 2: OpenSearch (heaviest component — 512MB heap)"
+    cmds: [{ task: 'up:profile', vars: { PROFILE: search } }]
+
+  up:workflow:
+    desc: "Tier 2: Temporal server and UI"
+    cmds: [{ task: 'up:profile', vars: { PROFILE: workflow } }]
+
+  up:observability:
+    desc: "Tier 2: Prometheus, Grafana, Loki, Tempo"
+    cmds: [{ task: 'up:profile', vars: { PROFILE: observability } }]
+
+  up:full:
+    desc: Start everything (~8GB — see ADR-0002 on why this is not the default)
+    cmds:
+      - task: 'up:profile'
+        vars: { PROFILE: full }
+      - task: migrate
+      - task: seed
+
+  down:
+    desc: Stop the local substrate, preserving data volumes
+    cmds:
+      - '{{.COMPOSE}} down --remove-orphans'
+
+  nuke:
+    desc: Stop the local substrate and delete all data volumes
+    prompt: This deletes every local volume, including the local evidence store. Continue?
+    cmds:
+      - '{{.COMPOSE}} down --remove-orphans --volumes'
+
+  ps:
+    desc: Show local substrate container status
+    cmds:
+      - '{{.COMPOSE}} ps'
+
+  logs:
+    desc: Tail local substrate logs (SERVICE=postgres to narrow)
+    cmds:
+      - '{{.COMPOSE}} logs --follow --tail 100 {{.SERVICE}}'
+
+  psql:
+    desc: Open a psql shell against the local database
+    interactive: true
+    cmds:
+      - '{{.COMPOSE}} exec postgres psql -U satta -d satta'
+
+  # ------------------------------------------------------------------ migration
+
+  migrate:
+    desc: Apply all owned schema migrations to the local database
+    cmds:
+      - go run ./cmd/platformctl migrate --database-url "{{.POSTGRES_DSN}}"
+
+  migrate:status:
+    desc: Show which migrations have been applied
+    cmds:
+      - go run ./cmd/platformctl migrate --database-url "{{.POSTGRES_DSN}}" --status
+
+  seed:
+    desc: Load local development tenants and policy configuration
+    cmds:
+      - go run ./cmd/platformctl seed --database-url "{{.POSTGRES_DSN}}"
+
+  # ----------------------------------------------------------------- code gates
+
+  build:
+    desc: Build all Go packages
+    cmds:
+      - go build {{.GO_PACKAGES}}
+
+  test:
+    desc: Run unit tests (no substrate required)
+    cmds:
+      - go test -race -count=1 {{.GO_PACKAGES}}
+
+  test:integration:
+    desc: Run integration tests against the local substrate
+    deps: [up]
+    cmds:
+      # PLATFORM_TEST_DATABASE_URL is what gates the integration suites. It is a
+      # separate variable from DATABASE_URL on purpose: a test suite that
+      # truncates tables must never be able to reach a database just because a
+      # service connection string happened to be exported.
+      - PLATFORM_TEST_DATABASE_URL="{{.POSTGRES_DSN}}" go test -race -count=1 -tags=integration {{.GO_PACKAGES}}
+
+  test:all:
+    desc: Run unit and integration tests
+    cmds:
+      - task: test
+      - task: test:integration
+
+  cover:
+    desc: Run tests with coverage and write coverage.html
+    cmds:
+      - go test -race -count=1 -coverprofile=coverage.out {{.GO_PACKAGES}}
+      - go tool cover -html=coverage.out -o coverage.html
+      - cmd: echo "coverage report: coverage.html"
+        silent: true
+
+  lint:
+    desc: Run all linters
+    cmds:
+      - task: lint:go
+      - task: lint:proto
+      - task: lint:invariants
+
+  lint:go:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run
+
+  lint:proto:
+    desc: Lint protobuf definitions
+    dir: proto
+    cmds:
+      - buf lint
+
+  lint:invariants:
+    desc: Check the safety invariants that are statically checkable
+    cmds:
+      - ./scripts/check-invariants.sh
+
+  fmt:
+    desc: Format Go and protobuf sources
+    cmds:
+      - gofmt -w -s libs cmd services
+      - go run golang.org/x/tools/cmd/goimports@v0.30.0 -w -local github.com/satta/platform libs cmd services
+      - cd proto && buf format --write
+
+  tidy:
+    desc: Tidy Go module dependencies
+    cmds:
+      - go mod tidy
+
+  generate:
+    desc: Generate code from protobuf definitions
+    cmds:
+      - task: tools:proto
+      - rm -rf libs/go/gen
+      - cd proto && buf generate
+      - go build ./libs/go/gen/...
+
+  tools:proto:
+    desc: Install the protobuf codegen plugins into GOPATH/bin
+    cmds:
+      - go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.6
+      - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+    status:
+      - test -x "$(go env GOPATH)/bin/protoc-gen-go"
+      - test -x "$(go env GOPATH)/bin/protoc-gen-go-grpc"
+
+  breaking:
+    desc: Check protobuf definitions for breaking changes against git HEAD
+    dir: proto
+    cmds:
+      - buf breaking --against '../.git#subdir=proto'
+
+  # ------------------------------------------------------------------ aggregate
+
+  ci:
+    desc: Everything CI enforces, runnable locally with one command
+    cmds:
+      - task: build
+      - task: lint
+      - task: test
+      - task: test:integration
+
+  verify:evidence:
+    desc: Verify the integrity of every local evidence chain
+    cmds:
+      - go run ./cmd/platformctl verify-evidence --database-url "{{.POSTGRES_DSN}}"

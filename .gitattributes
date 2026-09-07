@@ -1,0 +1,29 @@
+# Normalise line endings so a Windows checkout cannot break shell scripts, SQL migration
+# checksums, or the evidence hash pre-image tests.
+#
+# The migration checksum case is the one that bites: libs/go/db/migrate.go refuses to run a
+# migration whose content hash differs from the recorded one. A CRLF checkout would change
+# every hash and make an already-applied migration look edited.
+* text=auto eol=lf
+
+*.sh text eol=lf
+*.sql text eol=lf
+*.go text eol=lf
+*.proto text eol=lf
+Makefile text eol=lf
+
+# Generated code — collapsed in diffs and excluded from language statistics, but still
+# reviewed, because a codegen change that alters the wire format matters.
+libs/go/gen/** linguist-generated=true
+*.pb.go linguist-generated=true
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.docx binary

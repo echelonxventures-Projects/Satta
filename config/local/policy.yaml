@@ -1,0 +1,77 @@
+# Local development policy configuration.
+#
+# This file is the local implementation of the configuration port. The served configuration and
+# rules engine (Task 3) implements the same interface; nothing in the application knows the
+# difference.
+#
+# WHAT BELONGS HERE: business policy. Rake percentages, deposit limits, KYC thresholds, bonus
+# wagering multipliers, rounding modes, retention periods, jurisdiction rules.
+#
+# WHAT DOES NOT: infrastructure wiring. Connection strings, pool sizes, ports and timeouts are
+# environment configuration and are read from the environment. The distinction matters because
+# policy values are audited, versioned and jurisdiction-scoped, and infrastructure values are not.
+#
+# PRECEDENCE is global < jurisdiction < tenant < brand — narrower scopes override wider ones.
+# Two layers of equal specificity defining the same key is an error rather than a silent
+# file-order win, because silent order-dependence in policy is undetectable after the fact.
+#
+# The resolver has no resolve-with-default. A default at the call site is a hardcoded policy
+# value in disguise, and it is the mechanism by which one jurisdiction quietly runs another's
+# rules. A missing key is a boot failure listing every key that is absent.
+
+layers:
+  # ------------------------------------------------------------------ global defaults
+  - scope: {}
+    values:
+      # Ratios are "num/den" or "N%". A bare decimal is rejected: "0.05" is ambiguous between
+      # five percent and five hundredths, and money math must not guess.
+      platform.default_currency: "EUR"
+      platform.rounding_mode: "half_even"
+
+      # Retention classes are hashed into every evidence record, so retention cannot be
+      # shortened after the fact without breaking the chain.
+      evidence.retention_class.default: "operational-2y"
+      evidence.retention_class.financial: "financial-7y"
+      evidence.retention_class.compliance: "compliance-7y"
+      evidence.retention_class.security: "security-2y"
+      evidence.verify.page_size: "1000"
+
+      metering.default_unit: "count"
+      metering.outbox.batch_size: "100"
+
+      tenancy.default_jurisdiction: "mt"
+
+      # Deliberately conservative local values. These are development figures and carry no
+      # regulatory meaning; real limits are jurisdiction policy owned by compliance.
+      rg.reality_check.interval: "60m"
+      rg.session.max_duration: "4h"
+      rg.cooling_off.min_duration: "24h"
+
+  # -------------------------------------------------------------- Malta (MGA) jurisdiction
+  - scope:
+      jurisdiction_code: mt
+    values:
+      platform.default_currency: "EUR"
+      kyc.enhanced_due_diligence.threshold: "2000.00"
+      kyc.verification.deadline: "720h"
+      tax.withholding.rate: "0/100"
+      rg.deposit_limit.default_daily: "1000.00"
+      rg.reality_check.interval: "60m"
+
+  # ------------------------------------------------------------------ local dev tenant
+  - scope:
+      tenant_id: local
+    values:
+      # Narrower than global, so this wins for tenant "local" while other tenants keep the
+      # global value. This layer exists mainly to exercise precedence in tests.
+      platform.rounding_mode: "half_even"
+      metering.default_unit: "count"
+      evidence.chain.prefix: "local"
+
+  # ------------------------------------------------------------------ local dev brand
+  - scope:
+      tenant_id: local
+      brand_id: casino
+    values:
+      platform.default_currency: "EUR"
+      rg.reality_check.interval: "30m"

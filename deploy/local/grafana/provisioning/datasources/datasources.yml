@@ -1,0 +1,58 @@
+# Grafana datasources, provisioned so a fresh substrate is immediately usable.
+#
+# The trace-to-logs and logs-to-trace correlations below are the point of wiring all three
+# together: an error metric leads to a trace, a trace leads to the logs for that request, and
+# the logs carry the correlation ID that links onward to audit records and usage events.
+# Without those links each tool is a separate manual search.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      derivedFields:
+        # Services log trace_id as a structured field; this turns it into a link.
+        - name: TraceID
+          matcherRegex: '"trace_id":"(\w+)"'
+          url: '$${__value.raw}'
+          datasourceUid: tempo
+        - name: CorrelationID
+          matcherRegex: '"correlation_id":"([\w-]+)"'
+          url: '$${__value.raw}'
+
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: -5m
+        spanEndTimeShift: 5m
+        filterByTraceID: true
+        tags:
+          - key: service.name
+            value: service_name
+      tracesToMetrics:
+        datasourceUid: prometheus
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
