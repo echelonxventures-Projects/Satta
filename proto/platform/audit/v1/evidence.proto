@@ -35,6 +35,16 @@ service EvidenceService {
   // GetChainHead returns the current head sequence and hash for a chain, which
   // is what external notarisation and checkpointing anchor to.
   rpc GetChainHead(GetChainHeadRequest) returns (GetChainHeadResponse);
+
+  // Range returns records in an inclusive sequence range, ordered ascending.
+  // Read paths only; the RPC exists so wire clients can run the full Store
+  // contract, including verification streaming.
+  rpc Range(RangeRequest) returns (RangeResponse);
+
+  // GetByIdempotencyKey resolves an existing record by its caller-supplied
+  // de-duplication key. Callers use it to recover the outcome of an append
+  // whose response was lost.
+  rpc GetByIdempotencyKey(GetByIdempotencyKeyRequest) returns (GetByIdempotencyKeyResponse);
 }
 
 // EvidenceRecord is one immutable entry in a hash chain.
@@ -74,7 +84,18 @@ message EvidenceRecord {
 
   // Structured detail. Must not contain secrets or raw payment instrument
   // data; identity documents are referenced by handle, never embedded.
+  //
+  // Struct is the human-facing projection. It is lossy for large integers:
+  // Struct encodes every number as a double, and evidence payloads reject
+  // floating point (SAFETY INVARIANT 1), so round-tripping an int64 through
+  // Struct cannot reproduce the payload hash. hash-critical consumers use
+  // payload_encoded; payload is advisory.
   google.protobuf.Struct payload = 11;
+
+  // Canonical tagged, length-prefixed encoding of payload, exactly as hashed.
+  // This is the bytes that payload_hash covers, so a consumer can recompute
+  // hashes without reimplementing the encoder in its own language.
+  bytes payload_encoded = 19;
 
   // SHA-256 over the canonical encoding of `payload`.
   bytes payload_hash = 12;
@@ -173,4 +194,25 @@ message GetChainHeadResponse {
   uint64 sequence = 2;
   bytes head_hash = 3;
   google.protobuf.Timestamp updated_at = 4;
+}
+
+message RangeRequest {
+  string chain_id = 1;
+  // Inclusive lower bound. 0 or 1 starts at the beginning of the chain.
+  uint64 from_sequence = 2;
+  // Inclusive upper bound. 0 means "up to the current head".
+  uint64 to_sequence = 3;
+}
+
+message RangeResponse {
+  repeated EvidenceRecord records = 1;
+}
+
+message GetByIdempotencyKeyRequest {
+  string chain_id = 1;
+  string idempotency_key = 2;
+}
+
+message GetByIdempotencyKeyResponse {
+  EvidenceRecord record = 1;
 }

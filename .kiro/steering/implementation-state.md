@@ -18,6 +18,15 @@ now have ADRs with Status fields. Keep this file to state.
   `run --all-files` clean, `buf breaking` baselined (S3); CI workflow
   `.github/workflows/ci.yml` mirroring `task ci` + govulncheck SCA (S4); ADR-0006
   accepted Stage 4, ADR-0007 written, ADR-0002 pointer, ADR-0008 drafted (S5)
+- **S8 wire-level conformance (2026-09-07, PLAN v1.5)**: evidence contract suite
+  runs over real gRPC (bufconn) — MemoryStore unit + PostgresStore integration
+  (first `//go:build integration` file; migrator-role migrations, satta_app
+  RLS-bound traffic). Proto closed additively (Actor.on_behalf_of,
+  payload_encoded canonical bytes, Range + GetByIdempotencyKey RPCs — zero
+  breaking changes). evidencegrpc adapters, status↔sentinel mapping, metadata
+  convention. Canonical payload codec (DecodePayload/EncodePayload) with
+  round-trip + malformed-rejection tests. Suite caught 2 real wire bugs on
+  first run (chain-ID masking in client; caller-level auditor enforcement).
 
 ## In Progress
 
@@ -111,17 +120,21 @@ pre-commit 4.x (installed 2026-09-07, hooks active)
 ## Next Up
 
 1. ~~`git init` and initial commit~~ — done 2026-09-07 (Phase 0, S1–S3)
-2. S8 — Wire-level gRPC conformance suite for `evidencetest` (hard gate before any service)
+2. ~~S8 wire-level conformance~~ — done 2026-09-07 (v1.5): 11-scenario suite runs
+   over real gRPC against MemoryStore (unit) and PostgresStore (integration);
+   proto closed additively (on_behalf_of, payload_encoded, Range,
+   GetByIdempotencyKey); evidencegrpc adapters + metadata convention; suite
+   caught and fixed 2 real wire bugs on first run
 3. S9 — ADR-0001 retrofits (optimistic concurrency; trigger/RLS demotion; INSERT-only grant conformance)
-4. S10 — Golden test vectors (money / ratio / rounding / hash pre-image)
-5. S11 — Tests for the 10 untested packages + Postgres integration suite
+4. S10 — Golden test vectors (money / ratio / rounding / hash pre-image) — payload codec round-trip tests landed as part of S8; the cross-language corpus remains
+5. S11 — Tests for the untested packages + Postgres integration suite (evidence part done via S8 wire integration; db/config/tenancy/identity/metering/clock/correlation/platformctl remain)
 6. S4a — Deployment pipeline (Dockerfile + Helm + Argo CD) with the S12 service template
 7. S12 — Go service template: observability, httpx middleware, bootstrap, `services/template`
-8. Postgres metering emitter durability follow-up; golden vectors; `apps/`+`packages/` scaffold (S13)
+8. Postgres metering emitter durability follow-up; `apps/`+`packages/` scaffold (S13)
 9. Reconcile steering docs with ADR-0007; confirm Task 37/46 boundary (S44)
 10. Then Task 2 — workflow orchestration, Temporal behind a port (S15)
 
-**Master sequence:** `docs/PLAN.md` (S0–S52, now in execution; Phase 0 complete).
+**Master sequence:** `docs/PLAN.md` (S0–S52, now in execution; Phase 0 complete, S8 complete).
 
 ## Notes
 

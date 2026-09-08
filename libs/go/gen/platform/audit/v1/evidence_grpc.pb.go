@@ -8,7 +8,6 @@ package auditv1
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -20,11 +19,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	EvidenceService_Append_FullMethodName       = "/platform.audit.v1.EvidenceService/Append"
-	EvidenceService_AppendBatch_FullMethodName  = "/platform.audit.v1.EvidenceService/AppendBatch"
-	EvidenceService_Get_FullMethodName          = "/platform.audit.v1.EvidenceService/Get"
-	EvidenceService_Verify_FullMethodName       = "/platform.audit.v1.EvidenceService/Verify"
-	EvidenceService_GetChainHead_FullMethodName = "/platform.audit.v1.EvidenceService/GetChainHead"
+	EvidenceService_Append_FullMethodName              = "/platform.audit.v1.EvidenceService/Append"
+	EvidenceService_AppendBatch_FullMethodName         = "/platform.audit.v1.EvidenceService/AppendBatch"
+	EvidenceService_Get_FullMethodName                 = "/platform.audit.v1.EvidenceService/Get"
+	EvidenceService_Verify_FullMethodName              = "/platform.audit.v1.EvidenceService/Verify"
+	EvidenceService_GetChainHead_FullMethodName        = "/platform.audit.v1.EvidenceService/GetChainHead"
+	EvidenceService_Range_FullMethodName               = "/platform.audit.v1.EvidenceService/Range"
+	EvidenceService_GetByIdempotencyKey_FullMethodName = "/platform.audit.v1.EvidenceService/GetByIdempotencyKey"
 )
 
 // EvidenceServiceClient is the client API for EvidenceService service.
@@ -56,6 +57,14 @@ type EvidenceServiceClient interface {
 	// GetChainHead returns the current head sequence and hash for a chain, which
 	// is what external notarisation and checkpointing anchor to.
 	GetChainHead(ctx context.Context, in *GetChainHeadRequest, opts ...grpc.CallOption) (*GetChainHeadResponse, error)
+	// Range returns records in an inclusive sequence range, ordered ascending.
+	// Read paths only; the RPC exists so wire clients can run the full Store
+	// contract, including verification streaming.
+	Range(ctx context.Context, in *RangeRequest, opts ...grpc.CallOption) (*RangeResponse, error)
+	// GetByIdempotencyKey resolves an existing record by its caller-supplied
+	// de-duplication key. Callers use it to recover the outcome of an append
+	// whose response was lost.
+	GetByIdempotencyKey(ctx context.Context, in *GetByIdempotencyKeyRequest, opts ...grpc.CallOption) (*GetByIdempotencyKeyResponse, error)
 }
 
 type evidenceServiceClient struct {
@@ -116,6 +125,26 @@ func (c *evidenceServiceClient) GetChainHead(ctx context.Context, in *GetChainHe
 	return out, nil
 }
 
+func (c *evidenceServiceClient) Range(ctx context.Context, in *RangeRequest, opts ...grpc.CallOption) (*RangeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RangeResponse)
+	err := c.cc.Invoke(ctx, EvidenceService_Range_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *evidenceServiceClient) GetByIdempotencyKey(ctx context.Context, in *GetByIdempotencyKeyRequest, opts ...grpc.CallOption) (*GetByIdempotencyKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetByIdempotencyKeyResponse)
+	err := c.cc.Invoke(ctx, EvidenceService_GetByIdempotencyKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EvidenceServiceServer is the server API for EvidenceService service.
 // All implementations must embed UnimplementedEvidenceServiceServer
 // for forward compatibility.
@@ -145,6 +174,14 @@ type EvidenceServiceServer interface {
 	// GetChainHead returns the current head sequence and hash for a chain, which
 	// is what external notarisation and checkpointing anchor to.
 	GetChainHead(context.Context, *GetChainHeadRequest) (*GetChainHeadResponse, error)
+	// Range returns records in an inclusive sequence range, ordered ascending.
+	// Read paths only; the RPC exists so wire clients can run the full Store
+	// contract, including verification streaming.
+	Range(context.Context, *RangeRequest) (*RangeResponse, error)
+	// GetByIdempotencyKey resolves an existing record by its caller-supplied
+	// de-duplication key. Callers use it to recover the outcome of an append
+	// whose response was lost.
+	GetByIdempotencyKey(context.Context, *GetByIdempotencyKeyRequest) (*GetByIdempotencyKeyResponse, error)
 	mustEmbedUnimplementedEvidenceServiceServer()
 }
 
@@ -169,6 +206,12 @@ func (UnimplementedEvidenceServiceServer) Verify(context.Context, *VerifyRequest
 }
 func (UnimplementedEvidenceServiceServer) GetChainHead(context.Context, *GetChainHeadRequest) (*GetChainHeadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChainHead not implemented")
+}
+func (UnimplementedEvidenceServiceServer) Range(context.Context, *RangeRequest) (*RangeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Range not implemented")
+}
+func (UnimplementedEvidenceServiceServer) GetByIdempotencyKey(context.Context, *GetByIdempotencyKeyRequest) (*GetByIdempotencyKeyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetByIdempotencyKey not implemented")
 }
 func (UnimplementedEvidenceServiceServer) mustEmbedUnimplementedEvidenceServiceServer() {}
 func (UnimplementedEvidenceServiceServer) testEmbeddedByValue()                         {}
@@ -281,6 +324,42 @@ func _EvidenceService_GetChainHead_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EvidenceService_Range_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvidenceServiceServer).Range(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvidenceService_Range_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvidenceServiceServer).Range(ctx, req.(*RangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EvidenceService_GetByIdempotencyKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetByIdempotencyKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvidenceServiceServer).GetByIdempotencyKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvidenceService_GetByIdempotencyKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvidenceServiceServer).GetByIdempotencyKey(ctx, req.(*GetByIdempotencyKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // EvidenceService_ServiceDesc is the grpc.ServiceDesc for EvidenceService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -307,6 +386,14 @@ var EvidenceService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetChainHead",
 			Handler:    _EvidenceService_GetChainHead_Handler,
+		},
+		{
+			MethodName: "Range",
+			Handler:    _EvidenceService_Range_Handler,
+		},
+		{
+			MethodName: "GetByIdempotencyKey",
+			Handler:    _EvidenceService_GetByIdempotencyKey_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

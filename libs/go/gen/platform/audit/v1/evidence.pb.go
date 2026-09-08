@@ -7,16 +7,14 @@
 package auditv1
 
 import (
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
-
+	v1 "github.com/satta/platform/libs/go/gen/platform/common/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
-
-	v1 "github.com/satta/platform/libs/go/gen/platform/common/v1"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
 )
 
 const (
@@ -122,7 +120,17 @@ type EvidenceRecord struct {
 	Actor *v1.Actor `protobuf:"bytes,10,opt,name=actor,proto3" json:"actor,omitempty"`
 	// Structured detail. Must not contain secrets or raw payment instrument
 	// data; identity documents are referenced by handle, never embedded.
+	//
+	// Struct is the human-facing projection. It is lossy for large integers:
+	// Struct encodes every number as a double, and evidence payloads reject
+	// floating point (SAFETY INVARIANT 1), so round-tripping an int64 through
+	// Struct cannot reproduce the payload hash. hash-critical consumers use
+	// payload_encoded; payload is advisory.
 	Payload *structpb.Struct `protobuf:"bytes,11,opt,name=payload,proto3" json:"payload,omitempty"`
+	// Canonical tagged, length-prefixed encoding of payload, exactly as hashed.
+	// This is the bytes that payload_hash covers, so a consumer can recompute
+	// hashes without reimplementing the encoder in its own language.
+	PayloadEncoded []byte `protobuf:"bytes,19,opt,name=payload_encoded,json=payloadEncoded,proto3" json:"payload_encoded,omitempty"`
 	// SHA-256 over the canonical encoding of `payload`.
 	PayloadHash []byte `protobuf:"bytes,12,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
 	// `record_hash` of the preceding record in the chain. All zero for the
@@ -249,6 +257,13 @@ func (x *EvidenceRecord) GetActor() *v1.Actor {
 func (x *EvidenceRecord) GetPayload() *structpb.Struct {
 	if x != nil {
 		return x.Payload
+	}
+	return nil
+}
+
+func (x *EvidenceRecord) GetPayloadEncoded() []byte {
+	if x != nil {
+		return x.PayloadEncoded
 	}
 	return nil
 }
@@ -854,11 +869,213 @@ func (x *GetChainHeadResponse) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type RangeRequest struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	ChainId string                 `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Inclusive lower bound. 0 or 1 starts at the beginning of the chain.
+	FromSequence uint64 `protobuf:"varint,2,opt,name=from_sequence,json=fromSequence,proto3" json:"from_sequence,omitempty"`
+	// Inclusive upper bound. 0 means "up to the current head".
+	ToSequence    uint64 `protobuf:"varint,3,opt,name=to_sequence,json=toSequence,proto3" json:"to_sequence,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RangeRequest) Reset() {
+	*x = RangeRequest{}
+	mi := &file_platform_audit_v1_evidence_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RangeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RangeRequest) ProtoMessage() {}
+
+func (x *RangeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_audit_v1_evidence_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RangeRequest.ProtoReflect.Descriptor instead.
+func (*RangeRequest) Descriptor() ([]byte, []int) {
+	return file_platform_audit_v1_evidence_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *RangeRequest) GetChainId() string {
+	if x != nil {
+		return x.ChainId
+	}
+	return ""
+}
+
+func (x *RangeRequest) GetFromSequence() uint64 {
+	if x != nil {
+		return x.FromSequence
+	}
+	return 0
+}
+
+func (x *RangeRequest) GetToSequence() uint64 {
+	if x != nil {
+		return x.ToSequence
+	}
+	return 0
+}
+
+type RangeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Records       []*EvidenceRecord      `protobuf:"bytes,1,rep,name=records,proto3" json:"records,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RangeResponse) Reset() {
+	*x = RangeResponse{}
+	mi := &file_platform_audit_v1_evidence_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RangeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RangeResponse) ProtoMessage() {}
+
+func (x *RangeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_audit_v1_evidence_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RangeResponse.ProtoReflect.Descriptor instead.
+func (*RangeResponse) Descriptor() ([]byte, []int) {
+	return file_platform_audit_v1_evidence_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RangeResponse) GetRecords() []*EvidenceRecord {
+	if x != nil {
+		return x.Records
+	}
+	return nil
+}
+
+type GetByIdempotencyKeyRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ChainId        string                 `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,2,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetByIdempotencyKeyRequest) Reset() {
+	*x = GetByIdempotencyKeyRequest{}
+	mi := &file_platform_audit_v1_evidence_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetByIdempotencyKeyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetByIdempotencyKeyRequest) ProtoMessage() {}
+
+func (x *GetByIdempotencyKeyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_audit_v1_evidence_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetByIdempotencyKeyRequest.ProtoReflect.Descriptor instead.
+func (*GetByIdempotencyKeyRequest) Descriptor() ([]byte, []int) {
+	return file_platform_audit_v1_evidence_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetByIdempotencyKeyRequest) GetChainId() string {
+	if x != nil {
+		return x.ChainId
+	}
+	return ""
+}
+
+func (x *GetByIdempotencyKeyRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type GetByIdempotencyKeyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Record        *EvidenceRecord        `protobuf:"bytes,1,opt,name=record,proto3" json:"record,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetByIdempotencyKeyResponse) Reset() {
+	*x = GetByIdempotencyKeyResponse{}
+	mi := &file_platform_audit_v1_evidence_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetByIdempotencyKeyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetByIdempotencyKeyResponse) ProtoMessage() {}
+
+func (x *GetByIdempotencyKeyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_platform_audit_v1_evidence_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetByIdempotencyKeyResponse.ProtoReflect.Descriptor instead.
+func (*GetByIdempotencyKeyResponse) Descriptor() ([]byte, []int) {
+	return file_platform_audit_v1_evidence_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GetByIdempotencyKeyResponse) GetRecord() *EvidenceRecord {
+	if x != nil {
+		return x.Record
+	}
+	return nil
+}
+
 var File_platform_audit_v1_evidence_proto protoreflect.FileDescriptor
 
 const file_platform_audit_v1_evidence_proto_rawDesc = "" +
 	"\n" +
-	" platform/audit/v1/evidence.proto\x12\x11platform.audit.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1fplatform/common/v1/tenant.proto\"\xec\x05\n" +
+	" platform/audit/v1/evidence.proto\x12\x11platform.audit.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1fplatform/common/v1/tenant.proto\"\x95\x06\n" +
 	"\x0eEvidenceRecord\x12\x19\n" +
 	"\bchain_id\x18\x01 \x01(\tR\achainId\x12\x1a\n" +
 	"\bsequence\x18\x02 \x01(\x04R\bsequence\x125\n" +
@@ -874,7 +1091,8 @@ const file_platform_audit_v1_evidence_proto_rawDesc = "" +
 	"subject_id\x18\t \x01(\tR\tsubjectId\x12/\n" +
 	"\x05actor\x18\n" +
 	" \x01(\v2\x19.platform.common.v1.ActorR\x05actor\x121\n" +
-	"\apayload\x18\v \x01(\v2\x17.google.protobuf.StructR\apayload\x12!\n" +
+	"\apayload\x18\v \x01(\v2\x17.google.protobuf.StructR\apayload\x12'\n" +
+	"\x0fpayload_encoded\x18\x13 \x01(\fR\x0epayloadEncoded\x12!\n" +
 	"\fpayload_hash\x18\f \x01(\fR\vpayloadHash\x12\x1b\n" +
 	"\tprev_hash\x18\r \x01(\fR\bprevHash\x12\x1f\n" +
 	"\vrecord_hash\x18\x0e \x01(\fR\n" +
@@ -919,7 +1137,19 @@ const file_platform_audit_v1_evidence_proto_rawDesc = "" +
 	"\bsequence\x18\x02 \x01(\x04R\bsequence\x12\x1b\n" +
 	"\thead_hash\x18\x03 \x01(\fR\bheadHash\x129\n" +
 	"\n" +
-	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt*\xc7\x02\n" +
+	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"o\n" +
+	"\fRangeRequest\x12\x19\n" +
+	"\bchain_id\x18\x01 \x01(\tR\achainId\x12#\n" +
+	"\rfrom_sequence\x18\x02 \x01(\x04R\ffromSequence\x12\x1f\n" +
+	"\vto_sequence\x18\x03 \x01(\x04R\n" +
+	"toSequence\"L\n" +
+	"\rRangeResponse\x12;\n" +
+	"\arecords\x18\x01 \x03(\v2!.platform.audit.v1.EvidenceRecordR\arecords\"`\n" +
+	"\x1aGetByIdempotencyKeyRequest\x12\x19\n" +
+	"\bchain_id\x18\x01 \x01(\tR\achainId\x12'\n" +
+	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\"X\n" +
+	"\x1bGetByIdempotencyKeyResponse\x129\n" +
+	"\x06record\x18\x01 \x01(\v2!.platform.audit.v1.EvidenceRecordR\x06record*\xc7\x02\n" +
 	"\x10EvidenceCategory\x12!\n" +
 	"\x1dEVIDENCE_CATEGORY_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17EVIDENCE_CATEGORY_MONEY\x10\x01\x12\x1e\n" +
@@ -929,13 +1159,15 @@ const file_platform_audit_v1_evidence_proto_rawDesc = "" +
 	"\x1aEVIDENCE_CATEGORY_SECURITY\x10\x05\x12\x1e\n" +
 	"\x1aEVIDENCE_CATEGORY_GAMEPLAY\x10\x06\x12#\n" +
 	"\x1fEVIDENCE_CATEGORY_CONFIGURATION\x10\a\x12 \n" +
-	"\x1cEVIDENCE_CATEGORY_COMMERCIAL\x10\b2\xb4\x03\n" +
+	"\x1cEVIDENCE_CATEGORY_COMMERCIAL\x10\b2\xf6\x04\n" +
 	"\x0fEvidenceService\x12M\n" +
 	"\x06Append\x12 .platform.audit.v1.AppendRequest\x1a!.platform.audit.v1.AppendResponse\x12\\\n" +
 	"\vAppendBatch\x12%.platform.audit.v1.AppendBatchRequest\x1a&.platform.audit.v1.AppendBatchResponse\x12D\n" +
 	"\x03Get\x12\x1d.platform.audit.v1.GetRequest\x1a\x1e.platform.audit.v1.GetResponse\x12M\n" +
 	"\x06Verify\x12 .platform.audit.v1.VerifyRequest\x1a!.platform.audit.v1.VerifyResponse\x12_\n" +
-	"\fGetChainHead\x12&.platform.audit.v1.GetChainHeadRequest\x1a'.platform.audit.v1.GetChainHeadResponseB\xcd\x01\n" +
+	"\fGetChainHead\x12&.platform.audit.v1.GetChainHeadRequest\x1a'.platform.audit.v1.GetChainHeadResponse\x12J\n" +
+	"\x05Range\x12\x1f.platform.audit.v1.RangeRequest\x1a .platform.audit.v1.RangeResponse\x12t\n" +
+	"\x13GetByIdempotencyKey\x12-.platform.audit.v1.GetByIdempotencyKeyRequest\x1a..platform.audit.v1.GetByIdempotencyKeyResponseB\xcd\x01\n" +
 	"\x15com.platform.audit.v1B\rEvidenceProtoP\x01Z?github.com/satta/platform/libs/go/gen/platform/audit/v1;auditv1\xa2\x02\x03PAX\xaa\x02\x11Platform.Audit.V1\xca\x02\x11Platform\\Audit\\V1\xe2\x02\x1dPlatform\\Audit\\V1\\GPBMetadata\xea\x02\x13Platform::Audit::V1b\x06proto3"
 
 var (
@@ -951,52 +1183,62 @@ func file_platform_audit_v1_evidence_proto_rawDescGZIP() []byte {
 }
 
 var file_platform_audit_v1_evidence_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_platform_audit_v1_evidence_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_platform_audit_v1_evidence_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_platform_audit_v1_evidence_proto_goTypes = []any{
-	(EvidenceCategory)(0),         // 0: platform.audit.v1.EvidenceCategory
-	(*EvidenceRecord)(nil),        // 1: platform.audit.v1.EvidenceRecord
-	(*AppendRequest)(nil),         // 2: platform.audit.v1.AppendRequest
-	(*AppendResponse)(nil),        // 3: platform.audit.v1.AppendResponse
-	(*AppendBatchRequest)(nil),    // 4: platform.audit.v1.AppendBatchRequest
-	(*AppendBatchResponse)(nil),   // 5: platform.audit.v1.AppendBatchResponse
-	(*GetRequest)(nil),            // 6: platform.audit.v1.GetRequest
-	(*GetResponse)(nil),           // 7: platform.audit.v1.GetResponse
-	(*VerifyRequest)(nil),         // 8: platform.audit.v1.VerifyRequest
-	(*VerifyResponse)(nil),        // 9: platform.audit.v1.VerifyResponse
-	(*GetChainHeadRequest)(nil),   // 10: platform.audit.v1.GetChainHeadRequest
-	(*GetChainHeadResponse)(nil),  // 11: platform.audit.v1.GetChainHeadResponse
-	(*v1.TenantScope)(nil),        // 12: platform.common.v1.TenantScope
-	(*timestamppb.Timestamp)(nil), // 13: google.protobuf.Timestamp
-	(*v1.Actor)(nil),              // 14: platform.common.v1.Actor
-	(*structpb.Struct)(nil),       // 15: google.protobuf.Struct
+	(EvidenceCategory)(0),               // 0: platform.audit.v1.EvidenceCategory
+	(*EvidenceRecord)(nil),              // 1: platform.audit.v1.EvidenceRecord
+	(*AppendRequest)(nil),               // 2: platform.audit.v1.AppendRequest
+	(*AppendResponse)(nil),              // 3: platform.audit.v1.AppendResponse
+	(*AppendBatchRequest)(nil),          // 4: platform.audit.v1.AppendBatchRequest
+	(*AppendBatchResponse)(nil),         // 5: platform.audit.v1.AppendBatchResponse
+	(*GetRequest)(nil),                  // 6: platform.audit.v1.GetRequest
+	(*GetResponse)(nil),                 // 7: platform.audit.v1.GetResponse
+	(*VerifyRequest)(nil),               // 8: platform.audit.v1.VerifyRequest
+	(*VerifyResponse)(nil),              // 9: platform.audit.v1.VerifyResponse
+	(*GetChainHeadRequest)(nil),         // 10: platform.audit.v1.GetChainHeadRequest
+	(*GetChainHeadResponse)(nil),        // 11: platform.audit.v1.GetChainHeadResponse
+	(*RangeRequest)(nil),                // 12: platform.audit.v1.RangeRequest
+	(*RangeResponse)(nil),               // 13: platform.audit.v1.RangeResponse
+	(*GetByIdempotencyKeyRequest)(nil),  // 14: platform.audit.v1.GetByIdempotencyKeyRequest
+	(*GetByIdempotencyKeyResponse)(nil), // 15: platform.audit.v1.GetByIdempotencyKeyResponse
+	(*v1.TenantScope)(nil),              // 16: platform.common.v1.TenantScope
+	(*timestamppb.Timestamp)(nil),       // 17: google.protobuf.Timestamp
+	(*v1.Actor)(nil),                    // 18: platform.common.v1.Actor
+	(*structpb.Struct)(nil),             // 19: google.protobuf.Struct
 }
 var file_platform_audit_v1_evidence_proto_depIdxs = []int32{
-	12, // 0: platform.audit.v1.EvidenceRecord.scope:type_name -> platform.common.v1.TenantScope
-	13, // 1: platform.audit.v1.EvidenceRecord.occurred_at:type_name -> google.protobuf.Timestamp
-	13, // 2: platform.audit.v1.EvidenceRecord.recorded_at:type_name -> google.protobuf.Timestamp
+	16, // 0: platform.audit.v1.EvidenceRecord.scope:type_name -> platform.common.v1.TenantScope
+	17, // 1: platform.audit.v1.EvidenceRecord.occurred_at:type_name -> google.protobuf.Timestamp
+	17, // 2: platform.audit.v1.EvidenceRecord.recorded_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: platform.audit.v1.EvidenceRecord.category:type_name -> platform.audit.v1.EvidenceCategory
-	14, // 4: platform.audit.v1.EvidenceRecord.actor:type_name -> platform.common.v1.Actor
-	15, // 5: platform.audit.v1.EvidenceRecord.payload:type_name -> google.protobuf.Struct
+	18, // 4: platform.audit.v1.EvidenceRecord.actor:type_name -> platform.common.v1.Actor
+	19, // 5: platform.audit.v1.EvidenceRecord.payload:type_name -> google.protobuf.Struct
 	1,  // 6: platform.audit.v1.AppendRequest.record:type_name -> platform.audit.v1.EvidenceRecord
 	1,  // 7: platform.audit.v1.AppendBatchRequest.records:type_name -> platform.audit.v1.EvidenceRecord
 	3,  // 8: platform.audit.v1.AppendBatchResponse.results:type_name -> platform.audit.v1.AppendResponse
 	1,  // 9: platform.audit.v1.GetResponse.record:type_name -> platform.audit.v1.EvidenceRecord
-	13, // 10: platform.audit.v1.GetChainHeadResponse.updated_at:type_name -> google.protobuf.Timestamp
-	2,  // 11: platform.audit.v1.EvidenceService.Append:input_type -> platform.audit.v1.AppendRequest
-	4,  // 12: platform.audit.v1.EvidenceService.AppendBatch:input_type -> platform.audit.v1.AppendBatchRequest
-	6,  // 13: platform.audit.v1.EvidenceService.Get:input_type -> platform.audit.v1.GetRequest
-	8,  // 14: platform.audit.v1.EvidenceService.Verify:input_type -> platform.audit.v1.VerifyRequest
-	10, // 15: platform.audit.v1.EvidenceService.GetChainHead:input_type -> platform.audit.v1.GetChainHeadRequest
-	3,  // 16: platform.audit.v1.EvidenceService.Append:output_type -> platform.audit.v1.AppendResponse
-	5,  // 17: platform.audit.v1.EvidenceService.AppendBatch:output_type -> platform.audit.v1.AppendBatchResponse
-	7,  // 18: platform.audit.v1.EvidenceService.Get:output_type -> platform.audit.v1.GetResponse
-	9,  // 19: platform.audit.v1.EvidenceService.Verify:output_type -> platform.audit.v1.VerifyResponse
-	11, // 20: platform.audit.v1.EvidenceService.GetChainHead:output_type -> platform.audit.v1.GetChainHeadResponse
-	16, // [16:21] is the sub-list for method output_type
-	11, // [11:16] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	17, // 10: platform.audit.v1.GetChainHeadResponse.updated_at:type_name -> google.protobuf.Timestamp
+	1,  // 11: platform.audit.v1.RangeResponse.records:type_name -> platform.audit.v1.EvidenceRecord
+	1,  // 12: platform.audit.v1.GetByIdempotencyKeyResponse.record:type_name -> platform.audit.v1.EvidenceRecord
+	2,  // 13: platform.audit.v1.EvidenceService.Append:input_type -> platform.audit.v1.AppendRequest
+	4,  // 14: platform.audit.v1.EvidenceService.AppendBatch:input_type -> platform.audit.v1.AppendBatchRequest
+	6,  // 15: platform.audit.v1.EvidenceService.Get:input_type -> platform.audit.v1.GetRequest
+	8,  // 16: platform.audit.v1.EvidenceService.Verify:input_type -> platform.audit.v1.VerifyRequest
+	10, // 17: platform.audit.v1.EvidenceService.GetChainHead:input_type -> platform.audit.v1.GetChainHeadRequest
+	12, // 18: platform.audit.v1.EvidenceService.Range:input_type -> platform.audit.v1.RangeRequest
+	14, // 19: platform.audit.v1.EvidenceService.GetByIdempotencyKey:input_type -> platform.audit.v1.GetByIdempotencyKeyRequest
+	3,  // 20: platform.audit.v1.EvidenceService.Append:output_type -> platform.audit.v1.AppendResponse
+	5,  // 21: platform.audit.v1.EvidenceService.AppendBatch:output_type -> platform.audit.v1.AppendBatchResponse
+	7,  // 22: platform.audit.v1.EvidenceService.Get:output_type -> platform.audit.v1.GetResponse
+	9,  // 23: platform.audit.v1.EvidenceService.Verify:output_type -> platform.audit.v1.VerifyResponse
+	11, // 24: platform.audit.v1.EvidenceService.GetChainHead:output_type -> platform.audit.v1.GetChainHeadResponse
+	13, // 25: platform.audit.v1.EvidenceService.Range:output_type -> platform.audit.v1.RangeResponse
+	15, // 26: platform.audit.v1.EvidenceService.GetByIdempotencyKey:output_type -> platform.audit.v1.GetByIdempotencyKeyResponse
+	20, // [20:27] is the sub-list for method output_type
+	13, // [13:20] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_platform_audit_v1_evidence_proto_init() }
@@ -1010,7 +1252,7 @@ func file_platform_audit_v1_evidence_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_platform_audit_v1_evidence_proto_rawDesc), len(file_platform_audit_v1_evidence_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   11,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

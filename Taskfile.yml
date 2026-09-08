@@ -18,6 +18,13 @@ vars:
   # Local substrate credentials. Development-only values for a loopback-bound stack;
   # production secrets come from Vault. Ports are offset into 5xxxx — see the compose header.
   POSTGRES_DSN: postgres://satta:satta@127.0.0.1:55432/satta?sslmode=disable
+  # The ordinary request role, subject to RLS — integration suites run traffic
+  # through this DSN so tenant isolation is exercised as the real role sees it,
+  # not as the schema-owning admin (who bypasses row-level security).
+  POSTGRES_APP_DSN: postgres://satta_app:satta-app-dev@127.0.0.1:55432/satta?sslmode=disable
+  # The migration role — owns DDL and the default privileges that grant the
+  # application roles their table access at creation time.
+  POSTGRES_MIGRATOR_DSN: postgres://satta_migrator:satta-migrator-dev@127.0.0.1:55432/satta?sslmode=disable
   GO_PACKAGES: ./...
 
 env:
@@ -167,8 +174,13 @@ tasks:
       # PLATFORM_TEST_DATABASE_URL is what gates the integration suites. It is a
       # separate variable from DATABASE_URL on purpose: a test suite that
       # truncates tables must never be able to reach a database just because a
-      # service connection string happened to be exported.
-      - PLATFORM_TEST_DATABASE_URL="{{.POSTGRES_DSN}}" go test -race -count=1 -tags=integration {{.GO_PACKAGES}}
+      # service connection string happened to be exported. The APP DSN connects
+      # as the RLS-bound request role; admin is for schema lifecycle only.
+      - >-
+        PLATFORM_TEST_DATABASE_URL="{{.POSTGRES_DSN}}"
+        PLATFORM_TEST_APP_DATABASE_URL="{{.POSTGRES_APP_DSN}}"
+        PLATFORM_TEST_MIGRATOR_DATABASE_URL="{{.POSTGRES_MIGRATOR_DSN}}"
+        go test -race -count=1 -tags=integration {{.GO_PACKAGES}}
 
   test:all:
     desc: Run unit and integration tests
