@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/satta/platform/libs/go/db"
 	"github.com/satta/platform/libs/go/evidence"
 	"github.com/satta/platform/libs/go/identity"
 	"github.com/satta/platform/libs/go/tenancy"
@@ -130,7 +131,7 @@ func listChains(ctx context.Context, pool interface {
 			   AND ($2 = '' OR tenant_id = $2)
 			 ORDER BY tenant_id, chain_id`, chainFilter, tenantFilter)
 		if err != nil {
-			if isUndefinedTable(err) {
+			if db.IsUndefinedTable(err) {
 				// The schema has not been migrated. Reported as "no chains" rather than as an
 				// error, so that `task up` on a fresh database does not fail here.
 				return nil

@@ -2,20 +2,17 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
-	"sort"
 	"strconv"
 	"time"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/satta/platform/libs/go/db"
 	"github.com/satta/platform/libs/go/evidence"
 	"github.com/satta/platform/libs/go/metering"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // schemaOwner names a package that owns a set of migrations.
@@ -94,135 +91,23 @@ func runMigrate(ctx context.Context, args []string) error {
 	return applyGrants(ctx, pool)
 }
 
-// appendOnlyTables are the tables where UPDATE and DELETE must be impossible for the writing
-// role, not merely refused by a trigger.
-//
-// ADR-0001 moves append-only enforcement from PostgreSQL triggers to INSERT-only grants,
-// because grants exist on every database engine and triggers do not. The triggers remain as
-// optional hardening on PostgreSQL, but these grants are what upholds Invariant 4's "no
-// deletion path" clause on any engine — so this function is not optional, and
-// --skip-grants prints a warning rather than passing silently.
-var appendOnlyTables = []string{
-	"evidence_record",
-	"evidence_checkpoint",
-	"usage_event",
-}
-
-// mutableTables carry state that legitimately changes — a chain head pointer moves with every
-// append — and so are granted UPDATE.
-var mutableTables = []string{
-	"evidence_chain",
-	"schema_migration",
-}
+// Append-only enforcement is defined once, in the db package, so that
+// platformctl and the conformance suites assert the same role model
+// (ADR-0001: INSERT-only grants are the portable control; the triggers remain
+// as optional hardening on PostgreSQL).
 
 func applyGrants(ctx context.Context, pool *db.Pool) error {
-	// Roles are created by the substrate's first-boot script. On a database where they are
-	// absent — a bare PostgreSQL a developer pointed this at — granting would fail, so their
-	// presence is checked first and reported as a clear instruction rather than a driver error.
-	missing, err := missingRoles(ctx, pool)
-	if err != nil {
+	if err := db.ApplyAppendOnlyGrants(ctx, pool); err != nil {
 		return err
 	}
-	if len(missing) > 0 {
-		return fmt.Errorf(
-			"roles %v do not exist; apply deploy/local/postgres/00-init.sql, or re-run with --skip-grants "+
-				"and understand that append-only enforcement is then trigger-only (ADR-0001)", missing)
-	}
-
-	err = pool.InTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		for _, table := range appendOnlyTables {
-			// SELECT and INSERT only. The absence of UPDATE and DELETE here is the control.
-			if gerr := execGrant(ctx, tx,
-				`GRANT SELECT, INSERT ON `+table+` TO satta_appender`); gerr != nil {
-				return gerr
-			}
-			// Revoke explicitly rather than relying on never having granted. A previous
-			// migration or a hand-run GRANT ALL would otherwise leave the hole open.
-			if gerr := execGrant(ctx, tx,
-				`REVOKE UPDATE, DELETE, TRUNCATE ON `+table+` FROM satta_appender, satta_app`); gerr != nil {
-				return gerr
-			}
-			if gerr := execGrant(ctx, tx,
-				`GRANT SELECT, INSERT ON `+table+` TO satta_app`); gerr != nil {
-				return gerr
-			}
-			if gerr := execGrant(ctx, tx,
-				`GRANT SELECT ON `+table+` TO satta_auditor`); gerr != nil {
-				return gerr
-			}
-			// SAFETY INVARIANT 11: the auditor is read-only at the database layer too.
-			if gerr := execGrant(ctx, tx,
-				`REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON `+table+` FROM satta_auditor`); gerr != nil {
-				return gerr
-			}
-		}
-		for _, table := range mutableTables {
-			if gerr := execGrant(ctx, tx,
-				`GRANT SELECT, INSERT, UPDATE ON `+table+` TO satta_app, satta_appender`); gerr != nil {
-				return gerr
-			}
-			if gerr := execGrant(ctx, tx,
-				`REVOKE DELETE, TRUNCATE ON `+table+` FROM satta_app, satta_appender`); gerr != nil {
-				return gerr
-			}
-			if gerr := execGrant(ctx, tx,
-				`GRANT SELECT ON `+table+` TO satta_auditor`); gerr != nil {
-				return gerr
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("apply grants: %w", err)
-	}
-
 	fmt.Printf("grants applied: %d append-only table(s), %d mutable table(s)\n",
-		len(appendOnlyTables), len(mutableTables))
+		len(db.AppendOnlyTables), len(db.MutableTables))
 	return nil
 }
 
-// execGrant runs one grant statement, tolerating a missing table.
-//
-// Tables are created by whichever migrations have run. A grant against a table that does not
-// exist yet is not a failure worth aborting a migration for — the next run will apply it once
-// the owning migration lands.
-func execGrant(ctx context.Context, tx pgx.Tx, stmt string) error {
-	if _, err := tx.Exec(ctx, stmt); err != nil {
-		if isUndefinedTable(err) {
-			return nil
-		}
-		return fmt.Errorf("%s: %w", stmt, err)
-	}
-	return nil
-}
-
-func isUndefinedTable(err error) bool {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		return pgErr.Code == "42P01" // undefined_table
-	}
-	return false
-}
-
-func missingRoles(ctx context.Context, pool *db.Pool) ([]string, error) {
-	want := []string{"satta_app", "satta_appender", "satta_auditor"}
-	var missing []string
-	err := pool.InTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		for _, role := range want {
-			var exists bool
-			if err := tx.QueryRow(ctx,
-				`SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1)`, role).Scan(&exists); err != nil {
-				return fmt.Errorf("check role %s: %w", role, err)
-			}
-			if !exists {
-				missing = append(missing, role)
-			}
-		}
-		return nil
-	})
-	sort.Strings(missing)
-	return missing, err
-}
+// execGrant and the role/table grant model live in the db package
+// (db.ApplyAppendOnlyGrants) so the conformance suites assert the same
+// control platformctl applies.
 
 func reportStatus(ctx context.Context, pool *db.Pool) error {
 	type record struct {
@@ -237,7 +122,7 @@ func reportStatus(ctx context.Context, pool *db.Pool) error {
 		rows, err := tx.Query(ctx,
 			`SELECT owner, version, name, applied_at FROM schema_migration ORDER BY owner, version`)
 		if err != nil {
-			if isUndefinedTable(err) {
+			if db.IsUndefinedTable(err) {
 				return nil // Nothing has ever been applied.
 			}
 			return err

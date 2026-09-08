@@ -100,72 +100,181 @@ func (s *PostgresStore) AppendBatch(ctx context.Context, chainID string, records
 	}
 
 	var results []AppendResult
-	err = s.pool.InTenantTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		head, headHash, lerr := s.lockChain(ctx, tx, chainID, callerScope.TenantID)
-		if lerr != nil {
-			return lerr
-		}
-
-		batchResults := make([]AppendResult, 0, len(records))
-		nextSequence := head + 1
-		prevHash := headHash
-		now := s.clock.Now()
-		seenKeys := make(map[string]struct{}, len(records))
-
-		for i, in := range records {
-			if existing, found, ferr := s.findByKey(ctx, tx, chainID, in.IdempotencyKey); ferr != nil {
-				return ferr
-			} else if found {
-				batchResults = append(batchResults, AppendResult{
-					Sequence:     existing.Sequence,
-					RecordHash:   existing.RecordHash,
-					Deduplicated: true,
-				})
-				continue
-			}
-			if _, dup := seenKeys[in.IdempotencyKey]; dup {
-				return fmt.Errorf("%w: idempotency key %q appears twice in one batch",
-					ErrInvalidRecord, in.IdempotencyKey)
-			}
-			seenKeys[in.IdempotencyKey] = struct{}{}
-
-			rec := in.Normalize()
-			rec.Sequence = nextSequence
-			rec.RecordedAt = now
-			rec.PrevHash = prevHash
-			if rec.PayloadHash, err = HashPayload(rec.Payload); err != nil {
-				return fmt.Errorf("evidence: record %d: %w", i, err)
-			}
-			if rec.RecordHash, err = rec.ComputeHash(); err != nil {
-				return fmt.Errorf("evidence: record %d: %w", i, err)
-			}
-			if ierr := s.insertRecord(ctx, tx, rec); ierr != nil {
-				return fmt.Errorf("evidence: record %d: %w", i, ierr)
-			}
-
-			batchResults = append(batchResults, AppendResult{Sequence: rec.Sequence, RecordHash: rec.RecordHash})
-			prevHash = rec.RecordHash
-			nextSequence++
-		}
-
-		if nextSequence-1 != head {
-			if _, uerr := tx.Exec(ctx,
-				`UPDATE evidence_chain SET head_sequence = $2, head_hash = $3 WHERE chain_id = $1`,
-				chainID, nextSequence-1, prevHash); uerr != nil {
-				return fmt.Errorf("evidence: advance chain head: %w", uerr)
-			}
-		}
-		results = batchResults
-		return nil
-	})
+	err = s.appendWithOptimism(ctx, chainID, records, callerScope, &results)
 	if err != nil {
 		return nil, err
 	}
 	return results, nil
 }
 
-// lockChain returns the chain's current head, creating the chain if needed, and
-// holds a row lock for the remainder of the transaction.
+// appendWithOptimism runs the append transaction, retrying when a concurrent
+// writer advanced the chain head between this transaction's read and its
+// compare-and-swap. Idempotency keys make a retry safe: if the first attempt
+// actually committed before the race was noticed, the retry deduplicates
+// against the committed records rather than double-writing.
+func (s *PostgresStore) appendWithOptimism(ctx context.Context, chainID string, records []Record, callerScope tenancy.Scope, results *[]AppendResult) error {
+	for attempt := 0; ; attempt++ {
+		err := s.pool.InTenantTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
+			return s.appendTx(ctx, tx, chainID, records, callerScope, results)
+		})
+		if !errors.Is(err, errChainHeadMoved) {
+			return err
+		}
+		if attempt >= appendOptimisticRetries {
+			return fmt.Errorf("evidence: append to chain %q lost %d optimistic races: %w",
+				chainID, attempt+1, err)
+		}
+		// Lost the race; the transaction aborted without committing, so the
+		// next attempt reads the winner's head and continues the chain. The
+		// backoff staggers re-races so a burst of writers drains instead of
+		// re-colliding in lockstep. The wait is a fixed interval measured
+		// against the injected clock, so tests with a Fixed clock are not
+		// affected and cancellation aborts the wait as well as the work.
+		if waitErr := sleepContext(ctx, s.clock, appendRetryBackoff); waitErr != nil {
+			return waitErr
+		}
+	}
+}
+
+// appendTx is one append attempt inside a transaction.
+//
+// The compare-and-swap runs BEFORE the record inserts, not after: the chain
+// head row is the serialisation point, and reserving the sequence range up
+// front means a transaction that loses the race has written nothing at all.
+// Ordering it the other way round lets two transactions read the same head,
+// both insert records at overlapping sequences, and collide on the record
+// primary key — the failure the concurrent-append race test exists to catch.
+func (s *PostgresStore) appendTx(ctx context.Context, tx pgx.Tx, chainID string, records []Record, callerScope tenancy.Scope, results *[]AppendResult) error {
+	head, headHash, lerr := s.lockChain(ctx, tx, chainID, callerScope.TenantID)
+	if lerr != nil {
+		return lerr
+	}
+
+	// Which records are actually new? Keys already present in the chain
+	// deduplicate — a retried append whose first attempt committed must not
+	// write twice, and that is decided before any sequence numbers are handed
+	// out.
+	batchResults := make([]AppendResult, 0, len(records))
+	fresh := make([]Record, 0, len(records))
+	seenKeys := make(map[string]struct{}, len(records))
+	for _, in := range records {
+		if existing, found, ferr := s.findByKey(ctx, tx, chainID, in.IdempotencyKey); ferr != nil {
+			return ferr
+		} else if found {
+			batchResults = append(batchResults, AppendResult{
+				Sequence:     existing.Sequence,
+				RecordHash:   existing.RecordHash,
+				Deduplicated: true,
+			})
+			continue
+		}
+		if _, dup := seenKeys[in.IdempotencyKey]; dup {
+			return fmt.Errorf("%w: idempotency key %q appears twice in one batch",
+				ErrInvalidRecord, in.IdempotencyKey)
+		}
+		seenKeys[in.IdempotencyKey] = struct{}{}
+		fresh = append(fresh, in)
+	}
+
+	if len(fresh) == 0 {
+		// Every record deduplicated; nothing to write, nothing to advance.
+		*results = batchResults
+		return nil
+	}
+
+	// Hash the fresh records against the read head, so the final head hash is
+	// known before the reservation.
+	now := s.clock.Now()
+	prevHash := headHash
+	for i := range fresh {
+		rec := fresh[i].Normalize()
+		rec.Sequence = head + uint64(i) + 1
+		rec.RecordedAt = now
+		rec.PrevHash = prevHash
+		var herr error
+		if rec.PayloadHash, herr = HashPayload(rec.Payload); herr != nil {
+			return fmt.Errorf("evidence: record %d: %w", i, herr)
+		}
+		if rec.RecordHash, herr = rec.ComputeHash(); herr != nil {
+			return fmt.Errorf("evidence: record %d: %w", i, herr)
+		}
+		fresh[i] = rec
+		prevHash = rec.RecordHash
+	}
+
+	// Reserve the sequence range: the head moves only if it is still where
+	// this transaction read it. Zero rows affected means a concurrent writer
+	// won the race — abort and retry, with nothing written.
+	tag, uerr := tx.Exec(ctx,
+		`UPDATE evidence_chain SET head_sequence = $2, head_hash = $3
+		 WHERE chain_id = $1 AND head_sequence = $4`,
+		chainID, int64(head)+int64(len(fresh)), prevHash, int64(head))
+	if uerr != nil {
+		return fmt.Errorf("evidence: advance chain head: %w", uerr)
+	}
+	if tag.RowsAffected() == 0 {
+		return errChainHeadMoved
+	}
+
+	// Range reserved; these inserts cannot collide with another writer.
+	for i := range fresh {
+		if ierr := s.insertRecord(ctx, tx, fresh[i]); ierr != nil {
+			return fmt.Errorf("evidence: record %d: %w", i, ierr)
+		}
+		batchResults = append(batchResults, AppendResult{Sequence: fresh[i].Sequence, RecordHash: fresh[i].RecordHash})
+	}
+
+	*results = batchResults
+	return nil
+}
+
+// sleepContext waits for d or ctx cancellation, whichever comes first. The
+// deadline is computed against the injected clock (SAFETY INVARIANT 12),
+// keeping the wait testable rather than reading a wall clock the test cannot
+// control.
+func sleepContext(ctx context.Context, clk clock.Clock, d time.Duration) error {
+	deadline := clk.Now().Add(d)
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(remaining):
+			return nil
+		}
+	}
+}
+
+// errChainHeadMoved is the internal retry signal: another writer advanced the
+// chain head between this transaction's read and its compare-and-swap.
+var errChainHeadMoved = errors.New("evidence: chain head moved during append")
+
+// appendOptimisticRetries bounds how often a lost race is retried before the
+// caller hears about it. Retries are cheap (the losing transaction aborted
+// before writing anything that matters), and idempotency keys make a
+// caller-visible error safe to retry — so the bound exists to surface a
+// pathological contention storm, not to be hit by one. Eight concurrent
+// writers on one chain can lose several races each before landing; the bound
+// is set well above that, with a small backoff between attempts to let the
+// contention drain.
+const appendOptimisticRetries = 32
+
+// appendRetryBackoff is slept between lost races, so a burst of writers
+// re-races in a stagger rather than in lockstep. The context is respected:
+// cancellation aborts the wait as well as the work.
+const appendRetryBackoff = 2 * time.Millisecond
+
+// lockChain returns the chain's current head, creating the chain if needed.
+//
+// ADR-0001 / S9: the head is read WITHOUT FOR UPDATE. Concurrency control is
+// optimistic — the append that advances the head does so with a compare-and-
+// swap on the sequence it read, and a lost race surfaces as a retry rather
+// than as lock queueing. Pessimistic row locks serialise every append to a
+// chain behind one transaction; optimistic control only pays when there is
+// actual contention, and the retry is bounded by appendOptimisticRetries.
 func (s *PostgresStore) lockChain(ctx context.Context, tx pgx.Tx, chainID, tenantID string) (uint64, []byte, error) {
 	// ON CONFLICT DO NOTHING rather than a read-then-insert, so that two
 	// concurrent first-appends to a new chain do not race.
@@ -181,7 +290,7 @@ func (s *PostgresStore) lockChain(ctx context.Context, tx pgx.Tx, chainID, tenan
 	var headHash []byte
 	var owner string
 	err := tx.QueryRow(ctx,
-		`SELECT head_sequence, head_hash, tenant_id FROM evidence_chain WHERE chain_id = $1 FOR UPDATE`,
+		`SELECT head_sequence, head_hash, tenant_id FROM evidence_chain WHERE chain_id = $1`,
 		chainID).Scan(&head, &headHash, &owner)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// The insert above did nothing and the row is invisible, which under
@@ -189,7 +298,7 @@ func (s *PostgresStore) lockChain(ctx context.Context, tx pgx.Tx, chainID, tenan
 		return 0, nil, fmt.Errorf("%w: chain %q is not visible to tenant %q", ErrChainMismatch, chainID, tenantID)
 	}
 	if err != nil {
-		return 0, nil, fmt.Errorf("evidence: lock chain %q: %w", chainID, err)
+		return 0, nil, fmt.Errorf("evidence: read chain %q: %w", chainID, err)
 	}
 	if owner != tenantID {
 		return 0, nil, fmt.Errorf("%w: chain %q belongs to tenant %q, caller is %q",
