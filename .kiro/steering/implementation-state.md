@@ -27,6 +27,14 @@ now have ADRs with Status fields. Keep this file to state.
   convention. Canonical payload codec (DecodePayload/EncodePayload) with
   round-trip + malformed-rejection tests. Suite caught 2 real wire bugs on
   first run (chain-ID masking in client; caller-level auditor enforcement).
+- **S9 ADR-0001 retrofits (2026-09-07, PLAN v1.6)**: optimistic concurrency
+  (CAS on chain head reserving sequences before inserts; 8-writer race test
+  green under -race; context-aware backoff on the injected clock); grants
+  extracted to `db.ApplyAppendOnlyGrants` (platformctl + suites share one
+  definition) with a behavioral conformance suite connecting as
+  satta_appender and satta_auditor; triggers remain as optional hardening
+  (migration files unedited — checksums immutable, hierarchy carries the
+  demotion).
 
 ## In Progress
 
@@ -125,8 +133,10 @@ pre-commit 4.x (installed 2026-09-07, hooks active)
    proto closed additively (on_behalf_of, payload_encoded, Range,
    GetByIdempotencyKey); evidencegrpc adapters + metadata convention; suite
    caught and fixed 2 real wire bugs on first run
-3. S9 — ADR-0001 retrofits (optimistic concurrency; trigger/RLS demotion; INSERT-only grant conformance)
-4. S10 — Golden test vectors (money / ratio / rounding / hash pre-image) — payload codec round-trip tests landed as part of S8; the cross-language corpus remains
+3. ~~S9 ADR-0001 retrofits~~ — done 2026-09-07 (v1.6): optimistic concurrency
+   (CAS-before-inserts, race-tested), grants extracted + behaviorally
+   conformance-asserted, triggers documented as optional hardening
+4. S10 — Golden test vectors (money / ratio / rounding / hash pre-image) — payload codec round-trip tests landed with S8; the cross-language corpus remains
 5. S11 — Tests for the untested packages + Postgres integration suite (evidence part done via S8 wire integration; db/config/tenancy/identity/metering/clock/correlation/platformctl remain)
 6. S4a — Deployment pipeline (Dockerfile + Helm + Argo CD) with the S12 service template
 7. S12 — Go service template: observability, httpx middleware, bootstrap, `services/template`
