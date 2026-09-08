@@ -1,9 +1,9 @@
 # ADR-0006: Launch stage and product legality
 
-- **Status**: **Proposed** — implementation must not assume any option below
-- **Date**: 2026-08-01
+- **Status**: **Accepted** — Stage 4, licensed real money (2026-09-07)
+- **Date**: 2026-08-01 (proposed), 2026-09-07 (accepted)
 - **Supersedes**: none
-- **Superseded by**: none
+- **Superseded by**: none (cost-mandate consequence handled by ADR-0007)
 
 ## Context
 
@@ -28,7 +28,13 @@ take a bet.
 
 ## Decision
 
-**Not yet made.** Four options, in ascending order of cost and legal exposure.
+**Stage 4 — licensed real money.** Accepted 2026-09-07 per the Master Build Plan
+(`docs/PLAN.md` D1, v1.3). Stages 1–3 are **not abandoned**: they run as progressive
+pre-launch environments — stage 1 (play-money) from M2, stage 2 (social casino) and
+stage 3 (sweepstakes) as beta environments through M4 — exercising the full architecture
+honestly before real-money go-live at M6.
+
+The four options considered, in ascending order of cost and legal exposure:
 
 **Stage 1 — play-money / demo / portfolio.** No purchase, no prize of value. Legal
 essentially everywhere. Exercises the full architecture honestly. Fits the cost mandate with
@@ -47,18 +53,13 @@ licensing work.
 
 ## Consequences
 
-This decision **gates roadmap scope**, which is why it is the highest-leverage item
-outstanding.
+Stage 4 chosen: Tasks 10 (payments), 11 (withdrawals), 12 (KYC), 14 (risk/fraud/AML) and
+42 (tax) remain **launch-critical**; the L/R tagging in `task-roadmap.md` stands. The cost
+mandate in ADR-0002 **cannot hold** and is superseded by ADR-0007.
 
-If stage 1 or 2, then Tasks 10 (payments), 11 (withdrawals), 12 (KYC), 14 (risk/fraud/AML)
-and 42 (tax) are **not launch-critical**, and the L/R tagging in `task-roadmap.md` needs
-rewriting. Roughly a third of the launch slice disappears.
-
-If stage 3 or 4, the cost mandate in ADR-0002 cannot hold and that ADR must be superseded.
-
-What is **not** affected: Task 1 and the Phase 1 foundation are identical under all four
-options. Implementation can proceed on the foundation without this decision. It must not
-proceed into Phase 2 or 3 without it.
+What was **not** affected remains unchanged: Task 1 and the Phase 1 foundation are
+identical under all four options, which is why foundation work proceeded while this was
+Proposed.
 
 ## Alternatives considered
 

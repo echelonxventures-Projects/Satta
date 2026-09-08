@@ -94,7 +94,7 @@ func (v Value) LogAttrs() []any {
 }
 
 func (v Value) typeErr(want string, err error) error {
-	return fmt.Errorf("%w: key %q value %q is not a valid %s (from %s): %v",
+	return fmt.Errorf("%w: key %q value %q is not a valid %s (from %s): %w",
 		ErrWrongType, v.key, v.raw, want, v.scope.String(), err)
 }
 

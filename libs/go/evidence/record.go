@@ -149,10 +149,10 @@ func (r Record) Validate() error {
 		return fmt.Errorf("%w: chain_id is empty", ErrInvalidRecord)
 	}
 	if err := tenancy.ValidateIdentifier("chain_id", r.ChainID); err != nil {
-		return fmt.Errorf("%w: %s", ErrInvalidRecord, err)
+		return fmt.Errorf("%w: %w", ErrInvalidRecord, err)
 	}
 	if err := r.Scope.Validate(); err != nil {
-		return fmt.Errorf("%w: %s", ErrInvalidRecord, err)
+		return fmt.Errorf("%w: %w", ErrInvalidRecord, err)
 	}
 	if !validCategories[r.Category] {
 		return fmt.Errorf("%w: category %q is not a registered category", ErrInvalidRecord, r.Category)
@@ -164,7 +164,7 @@ func (r Record) Validate() error {
 		return fmt.Errorf("%w: subject_type and subject_id are both required", ErrInvalidRecord)
 	}
 	if err := r.Actor.Validate(); err != nil {
-		return fmt.Errorf("%w: %s", ErrInvalidRecord, err)
+		return fmt.Errorf("%w: %w", ErrInvalidRecord, err)
 	}
 	if r.OccurredAt.IsZero() {
 		return fmt.Errorf("%w: occurred_at is zero", ErrInvalidRecord)

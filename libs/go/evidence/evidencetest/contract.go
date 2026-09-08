@@ -239,7 +239,7 @@ func testBatch(t *testing.T, store evidence.Store) {
 			return r
 		}(),
 	}
-	if _, err := store.AppendBatch(ctx, ChainA, badBatch); err == nil {
+	if _, berr := store.AppendBatch(ctx, ChainA, badBatch); berr == nil {
 		t.Fatal("expected AppendBatch with an invalid record to fail")
 	}
 	head, err := store.Head(ctx, ChainA)
@@ -404,8 +404,8 @@ func testVerifyIntact(t *testing.T, store evidence.Store) {
 	if result.RecordsChecked != count {
 		t.Errorf("checked %d records, want %d", result.RecordsChecked, count)
 	}
-	if err := result.Err(); err != nil {
-		t.Errorf("Err() on an intact result: %v", err)
+	if rerr := result.Err(); rerr != nil {
+		t.Errorf("Err() on an intact result: %v", rerr)
 	}
 
 	// Verifying a sub-range must anchor to the record before it.

@@ -150,6 +150,11 @@ linters:
         # Named returns are used deliberately in a few places for documentation.
         - unnamedResult
         - hugeParam
+        # Evidence Records (440B) and UsageEvents (248B) are ranged by value in
+        # small batches and page loops; the copies are bounded and the indexed
+        # alternative trades readability for nothing measurable. Disabled
+        # alongside its sibling hugeParam, which the same reasoning applies to.
+        - rangeValCopy
 
     gosec:
       excludes:
@@ -172,6 +177,8 @@ linters:
         - authorization
         - authorize
         - normalize
+        - normalized
+        - serialized
         - serialize
 
     nolintlint:
@@ -217,6 +224,15 @@ linters:
         linters:
           - forbidigo
 
+      # money's allocation, ratio and parsing arithmetic use big.Int for
+      # intermediate 128-bit products only; every Amount stays int64 minor
+      # units (SAFETY INVARIANT 1). The math/big ban stays in force
+      # everywhere else.
+      - path: libs/go/money/(allocate|amount|ratio)\.go
+        linters:
+          - depguard
+        text: 'math/big'
+
       # Test code may panic, print and use fixed randomness.
       - path: (^|/)(.+)_test\.go
         linters:
@@ -231,10 +247,20 @@ linters:
           - unparam
 
       # Must* constructors are documented to panic; that is the contract callers
-      # opt into by choosing the Must variant.
+      # opt into by choosing the Must variant. The source pattern matches the
+      # function definition; the panics inside their bodies carry nolint
+      # directives where the definition pattern does not reach.
       - source: '^func Must'
         linters:
           - forbidigo
+
+      # platformctl is an operator CLI: its stdout output IS the product
+      # (migration tables, verification results). Structured logging arrives
+      # with the S12 service template and applies to services, not CLIs.
+      - path: cmd/platformctl/
+        linters:
+          - forbidigo
+        text: 'fmt\.Print'
 
       # SQL is assembled from constant column lists, never from caller input.
       - path: libs/go/evidence/postgres\.go

@@ -1,9 +1,9 @@
 # ADR-0002: Stage-0 single-box topology under a domain-and-hosting budget
 
-- **Status**: Accepted
+- **Status**: Accepted (topology); **cost mandate superseded by [ADR-0007](0007-production-cost-posture.md)** following the ADR-0006 Stage 4 acceptance
 - **Date**: 2026-08-01
 - **Supersedes**: none
-- **Superseded by**: none
+- **Superseded by**: [ADR-0007](0007-production-cost-posture.md) (cost mandate only; stage-0 topology remains the dev/local topology)
 
 ## Context
 

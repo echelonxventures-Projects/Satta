@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
 	"github.com/satta/platform/libs/go/clock"
 	"github.com/satta/platform/libs/go/tenancy"
 )
@@ -89,11 +90,10 @@ func (m *Meter) Record(
 // database. It mirrors the durable implementation's tenant checks and idempotency
 // so that the two behave identically under test.
 type MemoryEmitter struct {
-	mu     sync.Mutex
-	byID   map[string]UsageEvent
-	order  []string
-	rated  map[string]time.Time
-	closed bool
+	mu    sync.Mutex
+	byID  map[string]UsageEvent
+	order []string
+	rated map[string]time.Time
 }
 
 // NewMemoryEmitter returns an empty in-memory emitter.

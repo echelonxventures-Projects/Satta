@@ -5,8 +5,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/fs"
 	"math"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -26,35 +26,41 @@ var (
 // arithmetic, this fails before the code can reach the ledger.
 func TestNoFloatingPointInMoneyPackage(t *testing.T) {
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", func(fi fs.FileInfo) bool {
-		return !strings.HasSuffix(fi.Name(), "_test.go")
-	}, 0)
+	entries, err := os.ReadDir(".")
 	if err != nil {
-		t.Fatalf("parse money package: %v", err)
+		t.Fatalf("read money package dir: %v", err)
 	}
-	if len(pkgs) == 0 {
-		t.Fatal("no packages parsed; test is not exercising anything")
-	}
-
-	banned := map[string]bool{"float32": true, "float64": true, "complex64": true, "complex128": true}
-	for _, pkg := range pkgs {
-		for name, file := range pkg.Files {
-			ast.Inspect(file, func(n ast.Node) bool {
-				switch node := n.(type) {
-				case *ast.Ident:
-					if banned[node.Name] {
-						t.Errorf("%s: forbidden type %q in money package (SAFETY INVARIANT 1)",
-							filepath.Base(name), node.Name)
-					}
-				case *ast.BasicLit:
-					if node.Kind == token.FLOAT || node.Kind == token.IMAG {
-						t.Errorf("%s: forbidden floating-point literal %q in money package (SAFETY INVARIANT 1)",
-							filepath.Base(name), node.Value)
-					}
-				}
-				return true
-			})
+	parsed := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
 		}
+		file, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", name, err)
+		}
+		parsed++
+
+		banned := map[string]bool{"float32": true, "float64": true, "complex64": true, "complex128": true}
+		ast.Inspect(file, func(n ast.Node) bool {
+			switch node := n.(type) {
+			case *ast.Ident:
+				if banned[node.Name] {
+					t.Errorf("%s: forbidden type %q in money package (SAFETY INVARIANT 1)",
+						filepath.Base(name), node.Name)
+				}
+			case *ast.BasicLit:
+				if node.Kind == token.FLOAT || node.Kind == token.IMAG {
+					t.Errorf("%s: forbidden floating-point literal %q in money package (SAFETY INVARIANT 1)",
+						filepath.Base(name), node.Value)
+				}
+			}
+			return true
+		})
+	}
+	if parsed == 0 {
+		t.Fatal("no files parsed; test is not exercising anything")
 	}
 }
 
@@ -122,20 +128,20 @@ func TestAddSubRejectsCurrencyMismatch(t *testing.T) {
 }
 
 func TestOverflowIsDetectedNotWrapped(t *testing.T) {
-	max := money.MustNew(math.MaxInt64, eur)
+	maxAmt := money.MustNew(math.MaxInt64, eur)
 	one := money.MustNew(1, eur)
-	if _, err := max.Add(one); !errors.Is(err, money.ErrOverflow) {
+	if _, err := maxAmt.Add(one); !errors.Is(err, money.ErrOverflow) {
 		t.Fatalf("MaxInt64 + 1: got %v, want ErrOverflow", err)
 	}
 
-	min := money.MustNew(math.MinInt64, eur)
-	if _, err := min.Sub(one); !errors.Is(err, money.ErrOverflow) {
+	minAmt := money.MustNew(math.MinInt64, eur)
+	if _, err := minAmt.Sub(one); !errors.Is(err, money.ErrOverflow) {
 		t.Fatalf("MinInt64 - 1: got %v, want ErrOverflow", err)
 	}
-	if _, err := min.Neg(); !errors.Is(err, money.ErrOverflow) {
+	if _, err := minAmt.Neg(); !errors.Is(err, money.ErrOverflow) {
 		t.Fatalf("-MinInt64: got %v, want ErrOverflow", err)
 	}
-	if _, err := max.MulInt(2); !errors.Is(err, money.ErrOverflow) {
+	if _, err := maxAmt.MulInt(2); !errors.Is(err, money.ErrOverflow) {
 		t.Fatalf("MaxInt64 * 2: got %v, want ErrOverflow", err)
 	}
 }
@@ -417,10 +423,10 @@ func TestSumAndHelpers(t *testing.T) {
 	if total.Minor() != 65 {
 		t.Fatalf("Sum = %s, want 0.65", total)
 	}
-	if _, err := money.Sum(); err == nil {
+	if _, serr := money.Sum(); serr == nil {
 		t.Fatal("expected Sum() with no arguments to be rejected")
 	}
-	if _, err := money.Sum(money.MustNew(1, eur), money.MustNew(1, usd)); !errors.Is(err, money.ErrCurrencyMismatch) {
+	if _, merr := money.Sum(money.MustNew(1, eur), money.MustNew(1, usd)); !errors.Is(merr, money.ErrCurrencyMismatch) {
 		t.Fatal("expected mixed-currency Sum to be rejected")
 	}
 

@@ -86,13 +86,17 @@ func parseMigrationName(filename string) (version int, name string, err error) {
 
 const migrationTableDDL = `
 CREATE TABLE IF NOT EXISTS schema_migration (
-    version     integer     PRIMARY KEY,
+    owner       text        NOT NULL,
+    version     integer     NOT NULL,
     name        text        NOT NULL,
     checksum    text        NOT NULL,
-    applied_at  timestamptz NOT NULL DEFAULT now()
+    applied_at  timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (owner, version)
 )`
 
-// Migrate applies any migrations not yet recorded, in version order.
+// Migrate applies any migrations not yet recorded, in version order, under the
+// named owner. Owners are packages that embed their own migrations; each owner's
+// version sequence is independent, so evidence 0001 and metering 0001 coexist.
 //
 // Each migration runs in its own transaction together with the insert into
 // schema_migration, so a failure cannot leave a migration half-applied but
@@ -102,15 +106,15 @@ CREATE TABLE IF NOT EXISTS schema_migration (
 // is reported as an error rather than ignored: the environments that ran the old
 // text and the ones that would run the new text have silently different schemas,
 // and that difference surfaces later as a production-only failure.
-func Migrate(ctx context.Context, pool *Pool, migrations []Migration) (applied []int, err error) {
+func Migrate(ctx context.Context, pool *Pool, owner string, migrations []Migration) (applied []int, err error) {
 	if pool == nil || pool.pool == nil {
 		return nil, errors.New("db: pool is not open")
 	}
-	if _, err := pool.pool.Exec(ctx, migrationTableDDL); err != nil {
-		return nil, fmt.Errorf("db: create schema_migration: %w", err)
+	if _, terr := pool.pool.Exec(ctx, migrationTableDDL); terr != nil {
+		return nil, fmt.Errorf("db: create schema_migration: %w", terr)
 	}
 
-	rows, err := pool.pool.Query(ctx, `SELECT version, name, checksum FROM schema_migration`)
+	rows, err := pool.pool.Query(ctx, `SELECT version, name, checksum FROM schema_migration WHERE owner = $1`, owner)
 	if err != nil {
 		return nil, fmt.Errorf("db: read schema_migration: %w", err)
 	}
@@ -148,8 +152,8 @@ func Migrate(ctx context.Context, pool *Pool, migrations []Migration) (applied [
 				return fmt.Errorf("db: apply migration %04d_%s: %w", m.Version, m.Name, err)
 			}
 			if _, err := tx.Exec(ctx,
-				`INSERT INTO schema_migration (version, name, checksum) VALUES ($1, $2, $3)`,
-				m.Version, m.Name, m.Checksum); err != nil {
+				`INSERT INTO schema_migration (owner, version, name, checksum) VALUES ($1, $2, $3, $4)`,
+				owner, m.Version, m.Name, m.Checksum); err != nil {
 				return fmt.Errorf("db: record migration %04d_%s: %w", m.Version, m.Name, err)
 			}
 			return nil
@@ -162,11 +166,11 @@ func Migrate(ctx context.Context, pool *Pool, migrations []Migration) (applied [
 	return applied, nil
 }
 
-// MigrateFS is the common case: load from an embedded FS and apply.
-func MigrateFS(ctx context.Context, pool *Pool, fsys fs.FS, dir string) ([]int, error) {
+// MigrateFS is the common case: load from an embedded FS and apply under an owner.
+func MigrateFS(ctx context.Context, pool *Pool, owner string, fsys fs.FS, dir string) ([]int, error) {
 	migrations, err := LoadMigrations(fsys, dir)
 	if err != nil {
 		return nil, err
 	}
-	return Migrate(ctx, pool, migrations)
+	return Migrate(ctx, pool, owner, migrations)
 }

@@ -180,7 +180,10 @@ type Actor struct {
 	// Correlated session, where one exists.
 	SessionId string `protobuf:"bytes,4,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// Source network address, where known.
-	SourceIp      string `protobuf:"bytes,5,opt,name=source_ip,json=sourceIp,proto3" json:"source_ip,omitempty"`
+	SourceIp string `protobuf:"bytes,5,opt,name=source_ip,json=sourceIp,proto3" json:"source_ip,omitempty"`
+	// Principal a service is acting for, when a service performs work initiated
+	// by a human or another tenant. Part of the evidence hash pre-image.
+	OnBehalfOf    string `protobuf:"bytes,6,opt,name=on_behalf_of,json=onBehalfOf,proto3" json:"on_behalf_of,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -250,6 +253,13 @@ func (x *Actor) GetSourceIp() string {
 	return ""
 }
 
+func (x *Actor) GetOnBehalfOf() string {
+	if x != nil {
+		return x.OnBehalfOf
+	}
+	return ""
+}
+
 var File_platform_common_v1_tenant_proto protoreflect.FileDescriptor
 
 const file_platform_common_v1_tenant_proto_rawDesc = "" +
@@ -260,14 +270,16 @@ const file_platform_common_v1_tenant_proto_rawDesc = "" +
 	"\bbrand_id\x18\x02 \x01(\tR\abrandId\x12+\n" +
 	"\x11jurisdiction_code\x18\x03 \x01(\tR\x10jurisdictionCode\x12\x1f\n" +
 	"\vregion_code\x18\x04 \x01(\tR\n" +
-	"regionCode\"\xa9\x01\n" +
+	"regionCode\"\xcb\x01\n" +
 	"\x05Actor\x121\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x1d.platform.common.v1.ActorTypeR\x04type\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12!\n" +
 	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x04 \x01(\tR\tsessionId\x12\x1b\n" +
-	"\tsource_ip\x18\x05 \x01(\tR\bsourceIp*\xfd\x01\n" +
+	"\tsource_ip\x18\x05 \x01(\tR\bsourceIp\x12 \n" +
+	"\fon_behalf_of\x18\x06 \x01(\tR\n" +
+	"onBehalfOf*\xfd\x01\n" +
 	"\tActorType\x12\x1a\n" +
 	"\x16ACTOR_TYPE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11ACTOR_TYPE_PLAYER\x10\x01\x12\x1c\n" +

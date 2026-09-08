@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
 	"github.com/satta/platform/libs/go/clock"
 	"github.com/satta/platform/libs/go/db"
 	"github.com/satta/platform/libs/go/identity"
@@ -44,7 +45,7 @@ var _ Store = (*PostgresStore)(nil)
 // Migrate applies the evidence schema.
 func (s *PostgresStore) Migrate(ctx context.Context) error {
 	fsys, dir := Migrations()
-	_, err := db.MigrateFS(ctx, s.pool, fsys, dir)
+	_, err := db.MigrateFS(ctx, s.pool, "evidence", fsys, dir)
 	return err
 }
 
@@ -84,25 +85,25 @@ func (s *PostgresStore) AppendBatch(ctx context.Context, chainID string, records
 			return nil, fmt.Errorf("%w: record %d names chain %q but the batch targets %q",
 				ErrInvalidRecord, i, records[i].ChainID, chainID)
 		}
-		if err := records[i].Validate(); err != nil {
-			return nil, fmt.Errorf("evidence: record %d: %w", i, err)
+		if verr := records[i].Validate(); verr != nil {
+			return nil, fmt.Errorf("evidence: record %d: %w", i, verr)
 		}
-		if err := tenancy.CheckAccess(ctx, records[i].Scope); err != nil {
-			return nil, err
+		if aerr := tenancy.CheckAccess(ctx, records[i].Scope); aerr != nil {
+			return nil, aerr
 		}
-		if err := records[i].Actor.RequireWriteCapable(); err != nil {
-			return nil, fmt.Errorf("evidence: record %d: %w", i, err)
+		if werr := records[i].Actor.RequireWriteCapable(); werr != nil {
+			return nil, fmt.Errorf("evidence: record %d: %w", i, werr)
 		}
 	}
-	if err := tenancy.ValidateIdentifier("chain_id", chainID); err != nil {
-		return nil, err
+	if iderr := tenancy.ValidateIdentifier("chain_id", chainID); iderr != nil {
+		return nil, iderr
 	}
 
 	var results []AppendResult
 	err = s.pool.InTenantTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		head, headHash, err := s.lockChain(ctx, tx, chainID, callerScope.TenantID)
-		if err != nil {
-			return err
+		head, headHash, lerr := s.lockChain(ctx, tx, chainID, callerScope.TenantID)
+		if lerr != nil {
+			return lerr
 		}
 
 		batchResults := make([]AppendResult, 0, len(records))
@@ -112,8 +113,8 @@ func (s *PostgresStore) AppendBatch(ctx context.Context, chainID string, records
 		seenKeys := make(map[string]struct{}, len(records))
 
 		for i, in := range records {
-			if existing, found, err := s.findByKey(ctx, tx, chainID, in.IdempotencyKey); err != nil {
-				return err
+			if existing, found, ferr := s.findByKey(ctx, tx, chainID, in.IdempotencyKey); ferr != nil {
+				return ferr
 			} else if found {
 				batchResults = append(batchResults, AppendResult{
 					Sequence:     existing.Sequence,
@@ -138,8 +139,8 @@ func (s *PostgresStore) AppendBatch(ctx context.Context, chainID string, records
 			if rec.RecordHash, err = rec.ComputeHash(); err != nil {
 				return fmt.Errorf("evidence: record %d: %w", i, err)
 			}
-			if err := s.insertRecord(ctx, tx, rec); err != nil {
-				return fmt.Errorf("evidence: record %d: %w", i, err)
+			if ierr := s.insertRecord(ctx, tx, rec); ierr != nil {
+				return fmt.Errorf("evidence: record %d: %w", i, ierr)
 			}
 
 			batchResults = append(batchResults, AppendResult{Sequence: rec.Sequence, RecordHash: rec.RecordHash})
@@ -148,10 +149,10 @@ func (s *PostgresStore) AppendBatch(ctx context.Context, chainID string, records
 		}
 
 		if nextSequence-1 != head {
-			if _, err := tx.Exec(ctx,
+			if _, uerr := tx.Exec(ctx,
 				`UPDATE evidence_chain SET head_sequence = $2, head_hash = $3 WHERE chain_id = $1`,
-				chainID, nextSequence-1, prevHash); err != nil {
-				return fmt.Errorf("evidence: advance chain head: %w", err)
+				chainID, nextSequence-1, prevHash); uerr != nil {
+				return fmt.Errorf("evidence: advance chain head: %w", uerr)
 			}
 		}
 		results = batchResults
@@ -326,17 +327,17 @@ func (s *PostgresStore) Head(ctx context.Context, chainID string) (ChainHead, er
 		var hash []byte
 		var owner string
 		var updatedAt time.Time
-		err := tx.QueryRow(ctx,
+		qerr := tx.QueryRow(ctx,
 			`SELECT head_sequence, head_hash, tenant_id, updated_at FROM evidence_chain WHERE chain_id = $1`,
 			chainID).Scan(&sequence, &hash, &owner, &updatedAt)
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(qerr, pgx.ErrNoRows) {
 			// Either the chain does not exist, or row-level security is hiding
 			// another tenant's chain. Both are reported as empty: distinguishing
 			// them would confirm the existence of another tenant's chain.
 			return nil
 		}
-		if err != nil {
-			return fmt.Errorf("evidence: read chain head: %w", err)
+		if qerr != nil {
+			return fmt.Errorf("evidence: read chain head: %w", qerr)
 		}
 		out.Sequence = uint64(sequence)
 		out.HeadHash = hash
@@ -360,13 +361,13 @@ func (s *PostgresStore) Checkpoint(ctx context.Context, chainID, notaryKind, not
 		return ChainHead{}, fmt.Errorf("evidence: chain %q has no records to checkpoint", chainID)
 	}
 	err = s.pool.InTenantTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		_, err := tx.Exec(ctx,
+		_, xerr := tx.Exec(ctx,
 			`INSERT INTO evidence_checkpoint (chain_id, sequence, tenant_id, head_hash, notary_kind, notary_reference)
 			 VALUES ($1, $2, $3, $4, $5, $6)
 			 ON CONFLICT (chain_id, sequence) DO NOTHING`,
 			chainID, int64(head.Sequence), head.TenantID, head.HeadHash, notaryKind, notaryReference)
-		if err != nil {
-			return fmt.Errorf("evidence: record checkpoint: %w", err)
+		if xerr != nil {
+			return fmt.Errorf("evidence: record checkpoint: %w", xerr)
 		}
 		return nil
 	})

@@ -74,7 +74,7 @@ func (e UsageEvent) Validate() error {
 		return fmt.Errorf("%w: event_id is required and is the idempotency key", ErrInvalidEvent)
 	}
 	if err := e.Scope.RequireTenant(); err != nil {
-		return fmt.Errorf("%w: %s", ErrInvalidEvent, err)
+		return fmt.Errorf("%w: %w", ErrInvalidEvent, err)
 	}
 	if e.ProductCode == "" {
 		return fmt.Errorf("%w: product_code is required; usage must attach to a registered product", ErrInvalidEvent)

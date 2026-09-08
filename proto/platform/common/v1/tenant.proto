@@ -33,6 +33,9 @@ message Actor {
   string session_id = 4;
   // Source network address, where known.
   string source_ip = 5;
+  // Principal a service is acting for, when a service performs work initiated
+  // by a human or another tenant. Part of the evidence hash pre-image.
+  string on_behalf_of = 6;
 }
 
 enum ActorType {

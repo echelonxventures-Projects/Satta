@@ -44,7 +44,7 @@ type Amount struct {
 // New returns an Amount of minor units in cur.
 func New(minor int64, cur Currency) (Amount, error) {
 	if err := cur.Validate(); err != nil {
-		return Amount{}, fmt.Errorf("%w: %s", ErrInvalidCurrency, err)
+		return Amount{}, fmt.Errorf("%w: %w", ErrInvalidCurrency, err)
 	}
 	return Amount{minor: minor, currency: cur}, nil
 }
@@ -54,6 +54,7 @@ func New(minor int64, cur Currency) (Amount, error) {
 func MustNew(minor int64, cur Currency) Amount {
 	a, err := New(minor, cur)
 	if err != nil {
+		//nolint:forbidigo // Must* constructors panic by documented contract
 		panic(err)
 	}
 	return a
@@ -213,7 +214,7 @@ func (a Amount) Decimal() string {
 // Accepted forms: "12", "12.34", "-0.05", "+7.1", ".5".
 func Parse(s string, cur Currency) (Amount, error) {
 	if err := cur.Validate(); err != nil {
-		return Amount{}, fmt.Errorf("%w: %s", ErrInvalidCurrency, err)
+		return Amount{}, fmt.Errorf("%w: %w", ErrInvalidCurrency, err)
 	}
 	in := strings.TrimSpace(s)
 	if in == "" {

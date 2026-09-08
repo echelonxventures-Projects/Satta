@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
 	"github.com/satta/platform/libs/go/clock"
 	"github.com/satta/platform/libs/go/db"
 	"github.com/satta/platform/libs/go/tenancy"
@@ -50,7 +51,7 @@ var (
 // Migrate applies the metering schema.
 func (e *PostgresEmitter) Migrate(ctx context.Context) error {
 	fsys, dir := Migrations()
-	_, err := db.MigrateFS(ctx, e.pool, fsys, dir)
+	_, err := db.MigrateFS(ctx, e.pool, "metering", fsys, dir)
 	return err
 }
 
