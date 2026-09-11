@@ -1,0 +1,17 @@
+{{- if .Values.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Values.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.name }}
+    app.kubernetes.io/part-of: satta
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.name }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+{{- end }}

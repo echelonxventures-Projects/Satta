@@ -277,3 +277,26 @@ tasks:
     desc: Verify the integrity of every local evidence chain
     cmds:
       - go run ./cmd/platformctl verify-evidence --database-url "{{.POSTGRES_DSN}}"
+
+  # ------------------------------------------------------------- deploy (S4a)
+
+  image:build:
+    desc: Build one service image (SERVICE=template by default)
+    vars:
+      SERVICE: '{{.SERVICE | default "template"}}'
+    cmds:
+      - '{{.CONTAINER_ENGINE | default "docker"}} build --build-arg SERVICE={{.SERVICE}} -t satta-{{.SERVICE}}:dev -f deploy/images/Dockerfile.service .'
+
+  helm:lint:
+    desc: Lint the generic service chart
+    cmds:
+      - helm lint deploy/helm/satta-service
+      # Render with every optional ADR-0004 binding on: a template that can
+      # only render its happy path is a template that breaks on first use.
+      - helm template t deploy/helm/satta-service --set autoscaling.enabled=true --set metrics.serviceMonitor.enabled=true --set networkPolicy.enabled=true --set pdb.enabled=true > /dev/null
+
+  ci:infra:
+    desc: The deploy-pipeline half of CI, runnable locally in one command
+    cmds:
+      - task: image:build
+      - task: helm:lint

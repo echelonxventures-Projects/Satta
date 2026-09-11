@@ -29,7 +29,10 @@ repos:
       - id: check-yaml
         args: [--allow-multiple-documents]
         # Taskfile and Compose use templating that the strict YAML loader rejects.
-        exclude: ^(Taskfile\.yml|deploy/local/docker-compose\.yml)$
+        # deploy/helm/**/templates/* are Helm/Go templates, not YAML — they are
+        # validated by `task helm:lint` (helm lint + full render), which is the
+        # correct parser for them.
+        exclude: ^(Taskfile\.yml|deploy/local/docker-compose\.yml|deploy/helm/.*/templates/.*\.yaml)$
       - id: check-json
       - id: check-added-large-files
         args: [--maxkb=512]

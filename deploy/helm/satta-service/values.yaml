@@ -1,0 +1,85 @@
+# Values for one satta service. The defaults describe stage-0: single node,
+# small requests, no autoscaling, no optional bindings enabled. A service's
+# environment values file (deploy/argocd/environments/...) overrides what a
+# deployment actually needs; nothing is hardcoded into templates.
+
+# Identity stamped onto the pod and into the image label.
+name: template
+image:
+  repository: satta-template
+  # tag pinned by Argo CD image automation / the values file per environment —
+  # certified builds (S48) are referenced by digest, never by moving tag.
+  tag: dev
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+ports:
+  http: 8080
+  grpc: 9090
+
+# Environment wiring: DATABASE_URL etc. In production the secretRef points at
+# Vault-synced secrets; local stage-0 can use plain env for loopback DSNs.
+# NEVER put real credentials here.
+env: []
+envFromSecretRef: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+# The bootstrap's drain window (unready -> grace -> in-flight finish). The
+# pod termination budget must exceed it, or Kubernetes SIGKILLs mid-drain.
+drainSeconds: 15
+terminationGracePeriodSeconds: 40
+
+probes:
+  liveness:
+    path: /healthz
+    periodSeconds: 10
+    failureThreshold: 3
+  readiness:
+    path: /readyz
+    periodSeconds: 5
+    failureThreshold: 2
+    # generous startup allowance: migrations/telemetry boot before the first
+    # check window
+    initialDelaySeconds: 3
+
+service:
+  type: ClusterIP
+
+serviceAccount:
+  create: true
+
+# ---------------------------------------------------------------- ADR-0004
+# Deferred components: bindings, not deletions. The templates exist for every
+# optional control plane; the values file decides what is scheduled.
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilization: 70
+
+# prometheus-operator ServiceMonitor. stage-0 scrapes via the compose
+# Prometheus config instead; the binding exists so enabling it is a values
+# change, not a project.
+metrics:
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+
+# NetworkPolicy restricting ingress to the pod. The substrate policy work is
+# S51-adjacent; off in stage-0 loopback by design.
+networkPolicy:
+  enabled: false
+
+# PodDisruptionBudget: off for single-replica stage-0, on for every HA
+# environment (S51).
+pdb:
+  enabled: false
+  minAvailable: 1

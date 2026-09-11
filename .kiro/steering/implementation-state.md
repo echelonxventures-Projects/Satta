@@ -34,7 +34,19 @@ now have ADRs with Status fields. Keep this file to state.
   definition) with a behavioral conformance suite connecting as
   satta_appender and satta_auditor; triggers remain as optional hardening
   (migration files unedited — checksums immutable, hierarchy carries the
-  demotion).
+   demotion).
+ - **S10+S11 (2026-09-07, PLAN v1.7)**: golden vector corpus (51 vectors,
+   generated + replayed, cross-language format) and contract/unit suites for
+   every previously untested library package (clock, correlation, identity,
+   tenancy, config, db, metering incl. Postgres + EmitTx atomicity).
+ - **S12 service template (2026-09-11, PLAN v1.8)**: services/observability,
+   services/httpx, services/bootstrap, services/template — reference service
+   booted live against the substrate (M1 proof); EvidenceService served over
+   the S8 wire adapters as RLS-bound satta_app traffic; chain verified intact
+   by the independent platformctl verifier; graceful drain exercised. Two
+   live-discovered bugs fixed with regression tests (RequestLog before
+   CorrelationID; slog local-time). Finder duplicate `* N.go` files cleaned
+   from the evidence package.
 
 ## In Progress
 
@@ -136,15 +148,25 @@ pre-commit 4.x (installed 2026-09-07, hooks active)
 3. ~~S9 ADR-0001 retrofits~~ — done 2026-09-07 (v1.6): optimistic concurrency
    (CAS-before-inserts, race-tested), grants extracted + behaviorally
    conformance-asserted, triggers documented as optional hardening
-4. S10 — Golden test vectors (money / ratio / rounding / hash pre-image) — payload codec round-trip tests landed with S8; the cross-language corpus remains
-5. S11 — Tests for the untested packages + Postgres integration suite (evidence part done via S8 wire integration; db/config/tenancy/identity/metering/clock/correlation/platformctl remain)
-6. S4a — Deployment pipeline (Dockerfile + Helm + Argo CD) with the S12 service template
-7. S12 — Go service template: observability, httpx middleware, bootstrap, `services/template`
-8. Postgres metering emitter durability follow-up; `apps/`+`packages/` scaffold (S13)
-9. Reconcile steering docs with ADR-0007; confirm Task 37/46 boundary (S44)
-10. Then Task 2 — workflow orchestration, Temporal behind a port (S15)
+4. ~~S10 golden test vectors~~ — done 2026-09-07 (v1.7): libs/go/golden
+   versioned corpus + cmd/golden-generate; 51 replayed vectors across money,
+   ratio, rounding, allocation, canonical payload + record hash
+5. ~~S11 tests for untested packages~~ — done 2026-09-07 (v1.7): clock,
+   correlation, identity, tenancy, config, db, metering (contract suite run
+   against memory AND Postgres, EmitTx atomicity); platformctl covered
+   behaviorally via substrate tasks + integration suites
+ 6. ~~S12 Go service template~~ — done 2026-09-11 (v1.8): observability,
+    httpx, bootstrap, template live with M1 proof (chain intact via platformctl,
+    graceful drain exercised); 2 live bugs fixed with regression tests
+ 7. S4a — Deployment pipeline: per-service Dockerfile + Helm chart + Argo CD,
+    first bound to the S12 template (deployability proven at M1)
+ 8. S13 — `apps/` + `packages/` scaffold + generated api-client (ADR-0005)
+ 9. S14 — walk the 10 DoD gates and close Task 1
+ 10. Then S15 (Task 2 Temporal port), S16 (Task 3 config/rules engine +
+     jurisdiction→entity routing), S17 (Task 4 scheduler), S18 (Task 5 test
+     data), S19 (Task 6 IAM)
 
-**Master sequence:** `docs/PLAN.md` (S0–S52, now in execution; Phase 0 complete, S8 complete).
+**Master sequence:** `docs/PLAN.md` (S0–S52, in execution; Phase 0 and S8–S12 complete).
 
 ## Notes
 
