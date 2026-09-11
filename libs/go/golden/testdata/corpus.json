@@ -1,0 +1,550 @@
+{
+  "version": 1,
+  "money": [
+    {
+      "id": "money-add-basic",
+      "op": "add",
+      "inputs": [
+        1250,
+        -50
+      ],
+      "result": 1200
+    },
+    {
+      "id": "money-add-overflow",
+      "op": "add",
+      "inputs": [
+        "max_int64",
+        1
+      ],
+      "result": null,
+      "error": "overflow",
+      "note": "MaxInt64 + 1 must be detected, never wrapped"
+    },
+    {
+      "id": "money-sub-underflow",
+      "op": "sub",
+      "inputs": [
+        "min_int64",
+        1
+      ],
+      "result": null,
+      "error": "overflow"
+    },
+    {
+      "id": "money-mul-int",
+      "op": "mul_int",
+      "inputs": [
+        1250,
+        3
+      ],
+      "result": 3750
+    },
+    {
+      "id": "money-mul-overflow",
+      "op": "mul_int",
+      "inputs": [
+        "max_int64",
+        2
+      ],
+      "result": null,
+      "error": "overflow"
+    },
+    {
+      "id": "money-neg",
+      "op": "neg",
+      "inputs": [
+        -1250
+      ],
+      "result": 1250
+    },
+    {
+      "id": "money-neg-minint",
+      "op": "neg",
+      "inputs": [
+        "min_int64"
+      ],
+      "result": null,
+      "error": "overflow"
+    },
+    {
+      "id": "money-abs",
+      "op": "abs",
+      "inputs": [
+        -1250
+      ],
+      "result": 1250
+    },
+    {
+      "id": "money-parse-eur",
+      "op": "parse",
+      "inputs": [
+        "12.34",
+        "EUR",
+        2
+      ],
+      "result": 1234
+    },
+    {
+      "id": "money-parse-jpy",
+      "op": "parse",
+      "inputs": [
+        "1234",
+        "JPY",
+        0
+      ],
+      "result": 1234
+    },
+    {
+      "id": "money-parse-negative",
+      "op": "parse",
+      "inputs": [
+        "-0.05",
+        "EUR",
+        2
+      ],
+      "result": -5
+    },
+    {
+      "id": "money-parse-plus",
+      "op": "parse",
+      "inputs": [
+        "+7.1",
+        "EUR",
+        2
+      ],
+      "result": 710
+    },
+    {
+      "id": "money-parse-dotfive",
+      "op": "parse",
+      "inputs": [
+        ".5",
+        "EUR",
+        2
+      ],
+      "result": 50
+    },
+    {
+      "id": "money-parse-too-precise",
+      "op": "parse",
+      "inputs": [
+        "12.345",
+        "EUR",
+        2
+      ],
+      "result": null,
+      "error": "scale",
+      "note": "input finer than the currency's scale is rejected, not silently rounded"
+    },
+    {
+      "id": "money-parse-empty",
+      "op": "parse",
+      "inputs": [
+        "",
+        "EUR",
+        2
+      ],
+      "result": null,
+      "error": "empty"
+    },
+    {
+      "id": "money-decimal-eur",
+      "op": "decimal",
+      "inputs": [
+        1234,
+        "EUR",
+        2
+      ],
+      "result": "12.34"
+    },
+    {
+      "id": "money-decimal-negative",
+      "op": "decimal",
+      "inputs": [
+        -5,
+        "EUR",
+        2
+      ],
+      "result": "-0.05"
+    },
+    {
+      "id": "money-decimal-btc-satoshi",
+      "op": "decimal",
+      "inputs": [
+        1,
+        "BTC",
+        8
+      ],
+      "result": "0.00000001"
+    },
+    {
+      "id": "money-decimal-jpy",
+      "op": "decimal",
+      "inputs": [
+        1234,
+        "JPY",
+        0
+      ],
+      "result": "1234"
+    },
+    {
+      "id": "money-sum",
+      "op": "sum",
+      "inputs": [
+        1250,
+        -50,
+        800
+      ],
+      "result": 2000
+    }
+  ],
+  "ratio": [
+    {
+      "id": "ratio-parse-percent-int",
+      "op": "parse_percent",
+      "inputs": [
+        "50"
+      ],
+      "result": "50/100",
+      "note": "ParseRatioPercent takes a bare decimal: 50 means 50 percent"
+    },
+    {
+      "id": "ratio-parse-percent-frac",
+      "op": "parse_percent",
+      "inputs": [
+        "2.5"
+      ],
+      "result": "5/200",
+      "note": "2.5 percent as an exact fraction; no float ever appears in the parse"
+    },
+    {
+      "id": "ratio-parse-percent-fraction",
+      "op": "parse_percent",
+      "inputs": [
+        "5/100"
+      ],
+      "result": "1/2000",
+      "note": "big.Rat accepts fraction input; 5/100 as a percentage is 5/10000 = 1/2000"
+    },
+    {
+      "id": "ratio-parse-percent-garbage",
+      "op": "parse_percent",
+      "inputs": [
+        "five"
+      ],
+      "result": null,
+      "error": "exact decimal"
+    },
+    {
+      "id": "ratio-parse-percent-zero-denominator",
+      "op": "parse_percent",
+      "inputs": [
+        "5/0"
+      ],
+      "result": null,
+      "error": "not an exact decimal",
+      "note": "big.Rat refuses a zero denominator before NewRatio sees it"
+    },
+    {
+      "id": "ratio-apply-half-up",
+      "op": "apply",
+      "inputs": [
+        1001,
+        "1/2",
+        "half_up"
+      ],
+      "result": 501
+    },
+    {
+      "id": "ratio-apply-half-even",
+      "op": "apply",
+      "inputs": [
+        1000,
+        "1/2",
+        "half_even"
+      ],
+      "result": 500,
+      "note": "banker's rounding: 500 is even"
+    },
+    {
+      "id": "ratio-apply-half-even-odd",
+      "op": "apply",
+      "inputs": [
+        1002,
+        "1/2",
+        "half_even"
+      ],
+      "result": 501,
+      "note": "1002/2 = 501 exactly, so no rounding occurs"
+    },
+    {
+      "id": "ratio-apply-down",
+      "op": "apply",
+      "inputs": [
+        1001,
+        "1/2",
+        "down"
+      ],
+      "result": 500
+    },
+    {
+      "id": "ratio-apply-up",
+      "op": "apply",
+      "inputs": [
+        1001,
+        "1/2",
+        "up"
+      ],
+      "result": 501
+    },
+    {
+      "id": "ratio-apply-floor-negative",
+      "op": "apply",
+      "inputs": [
+        -1001,
+        "1/2",
+        "floor"
+      ],
+      "result": -501
+    },
+    {
+      "id": "ratio-apply-ceil-negative",
+      "op": "apply",
+      "inputs": [
+        -1001,
+        "1/2",
+        "ceil"
+      ],
+      "result": -500
+    },
+    {
+      "id": "ratio-apply-half-down",
+      "op": "apply",
+      "inputs": [
+        1001,
+        "1/2",
+        "half_down"
+      ],
+      "result": 500
+    },
+    {
+      "id": "ratio-apply-bonus-rate",
+      "op": "apply",
+      "inputs": [
+        1250,
+        "5/100",
+        "half_up"
+      ],
+      "result": 63,
+      "note": "12.50 * 5% = 0.625 -\u003e 0.63 half-up"
+    },
+    {
+      "id": "ratio-div-int-inexact",
+      "op": "div_int",
+      "inputs": [
+        1000,
+        3,
+        "down"
+      ],
+      "result": 333,
+      "note": "inexact division rounds; Allocate is what preserves the total"
+    },
+    {
+      "id": "ratio-rounding-name-roundtrip",
+      "op": "parse_rounding",
+      "inputs": [
+        "half_even"
+      ],
+      "result": "half_even"
+    }
+  ],
+  "allocation": [
+    {
+      "id": "alloc-even",
+      "amount": 1000,
+      "weights": [
+        1,
+        1
+      ],
+      "parts": [
+        500,
+        500
+      ]
+    },
+    {
+      "id": "alloc-weighted",
+      "amount": 1000,
+      "weights": [
+        1,
+        3
+      ],
+      "parts": [
+        250,
+        750
+      ]
+    },
+    {
+      "id": "alloc-remainder-to-first",
+      "amount": 1000,
+      "weights": [
+        1,
+        1,
+        1
+      ],
+      "parts": [
+        334,
+        333,
+        333
+      ],
+      "note": "1000/3: the waterfall gives the indivisible remainder to the first part deterministically"
+    },
+    {
+      "id": "alloc-zero-weight",
+      "amount": 1000,
+      "weights": [
+        0,
+        1
+      ],
+      "parts": [
+        0,
+        1000
+      ]
+    },
+    {
+      "id": "alloc-negative-amount",
+      "amount": -1000,
+      "weights": [
+        1,
+        1
+      ],
+      "parts": [
+        -500,
+        -500
+      ]
+    },
+    {
+      "id": "alloc-negative-weight",
+      "amount": 1000,
+      "weights": [
+        -1,
+        1
+      ],
+      "parts": null,
+      "error": "non-negative"
+    },
+    {
+      "id": "alloc-no-weights",
+      "amount": 1000,
+      "weights": [],
+      "parts": null,
+      "error": "at least one weight"
+    },
+    {
+      "id": "alloc-maxint64",
+      "amount": 9223372036854775807,
+      "weights": [
+        1,
+        1
+      ],
+      "parts": [
+        4611686018427387904,
+        4611686018427387903
+      ],
+      "note": "big.Int waterfall: MaxInt64 splits without overflow and the odd minor goes to the first part"
+    }
+  ],
+  "preimage": [
+    {
+      "id": "pre-empty",
+      "payload": {},
+      "encoding_hex": "6d00",
+      "sha256": "187355b101e4d1f66c7948f93d109b63e1e0e5ec14eba8043e6428aff3a3e4ca",
+      "note": "empty payload has a defined value, not a special case"
+    },
+    {
+      "id": "pre-scalars",
+      "payload": {
+        "b": true,
+        "i": 42,
+        "n": null,
+        "s": "value"
+      },
+      "encoding_hex": "6d040162620101696954016e6e0173730576616c7565",
+      "sha256": "9a498139d35129187d7fac0fdc67f16601a7d957f64f703ec2ceb632bb5abffd"
+    },
+    {
+      "id": "pre-money",
+      "payload": {
+        "amount_minor_units": 1250,
+        "currency_code": "EUR"
+      },
+      "encoding_hex": "6d0212616d6f756e745f6d696e6f725f756e69747369c4130d63757272656e63795f636f64657303455552",
+      "sha256": "ac7a3f3f3823e4a46c0b5fc6c48e8708360dd60d70f07a60d06bee72364390e2"
+    },
+    {
+      "id": "pre-nested",
+      "payload": {
+        "nested": {
+          "deep": 9
+        }
+      },
+      "encoding_hex": "6d01066e65737465646d0104646565706912",
+      "sha256": "93f6297b411092c89377e63bb9c4db6f539380d8571b60425043d764d1c26952"
+    },
+    {
+      "id": "pre-list",
+      "payload": {
+        "tags": [
+          "a",
+          "b"
+        ]
+      },
+      "encoding_hex": "6d0104746167736c02730161730162",
+      "sha256": "58d3800437dad1c11dda80523ca2132beaabba916b953bc436519c9e452e6b0f"
+    },
+    {
+      "id": "pre-int64-extremes",
+      "payload": {
+        "max": 9223372036854775807,
+        "min": -9223372036854775808
+      },
+      "encoding_hex": "6d02036d617869feffffffffffffffff01036d696e69ffffffffffffffffff01",
+      "sha256": "867ec1f015dc118c312353d45c4ac9d1d3ce16e9515a550e889f087cc7607ddf",
+      "note": "the extremes must hash identically in every language: two's-complement varints"
+    }
+  ],
+  "record_hash": [
+    {
+      "id": "record-genesis-ledger-transfer",
+      "record": {
+        "action": "ledger.transfer.posted",
+        "actor_display": "ledger",
+        "actor_id": "ledger",
+        "actor_on_behalf": "",
+        "actor_session": "",
+        "actor_source_ip": "",
+        "actor_type": "service",
+        "brand_id": "",
+        "category": "money",
+        "chain_id": "tenant-a-money",
+        "correlation_id": "corr-vec-1",
+        "idempotency_key": "vec-1",
+        "jurisdiction_code": "mt",
+        "occurred_at_utc": "2026-08-01T12:00:00",
+        "payload_hash": "ac7a3f3f3823e4a46c0b5fc6c48e8708360dd60d70f07a60d06bee72364390e2",
+        "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "recorded_at_utc": "2026-08-01T12:00:00.123",
+        "region_code": "eu-west",
+        "retention_class": "financial-7y",
+        "sequence": 1,
+        "subject_id": "wallet-1",
+        "subject_type": "wallet",
+        "tenant_id": "tenant-a",
+        "trace_id": ""
+      },
+      "payload_encoding_hex": "6d0212616d6f756e745f6d696e6f725f756e69747369c4130d63757272656e63795f636f64657303455552",
+      "record_hash": "995eb2f2e4413ce731296edc542ad288efa5557ef3d2c3afc1dd36a575ad5e1d"
+    }
+  ]
+}
