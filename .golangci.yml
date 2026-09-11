@@ -254,10 +254,11 @@ linters:
         linters:
           - forbidigo
 
-      # platformctl is an operator CLI: its stdout output IS the product
-      # (migration tables, verification results). Structured logging arrives
-      # with the S12 service template and applies to services, not CLIs.
-      - path: cmd/platformctl/
+      # cmd/ tools are operator CLIs: their stdout output IS the product
+      # (migration tables, verification results, corpus generation progress).
+      # Structured logging arrives with the S12 service template and applies
+      # to services, not CLIs.
+      - path: cmd/
         linters:
           - forbidigo
         text: 'fmt\.Print'
