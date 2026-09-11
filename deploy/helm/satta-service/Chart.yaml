@@ -1,0 +1,16 @@
+apiVersion: v2
+name: satta-service
+description: |
+  Generic chart for every service built from this monorepo. Services are thin:
+  one image pattern (deploy/images/Dockerfile.service), one lifecycle
+  (services/bootstrap), one wire contract per port. So one chart serves them
+  all and per-service differences live in values files, per ADR-0004: a
+  deferral is `enabled: false` in values, never a deleted template.
+type: application
+version: 0.1.0
+appVersion: "dev"
+keywords:
+  - igaming
+  - satta
+maintainers:
+  - name: echelonxventures-Projects

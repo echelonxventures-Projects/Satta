@@ -1,0 +1,25 @@
+# The template service in stage-0: proves the whole path — image built from
+# this repo (deploy/images/Dockerfile.service), chart satta-service, values
+# per environment, deployed by Argo with no manual kubectl. Every real
+# service lands as a sibling of this file.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: template
+  namespace: argocd
+spec:
+  project: satta
+  source:
+    repoURL: https://github.com/echelonxventures-Projects/Satta.git
+    targetRevision: main
+    path: deploy/helm/satta-service
+    helm:
+      valueFiles:
+        - ../../../environments/stage0/values/template.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: satta
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false

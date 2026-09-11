@@ -69,3 +69,24 @@ jobs:
 
       - name: Integration tests (local substrate)
         run: task test:integration
+
+  # The deploy-pipeline half (S4a): the same job a developer runs with
+  # `task ci:infra` — build the reference image, lint and fully render the chart.
+  infra:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.52.0
+
+      - name: Install helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+
+      - name: Image build + chart lint/render
+        run: task ci:infra

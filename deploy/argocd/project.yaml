@@ -1,0 +1,25 @@
+# ApplicationProject: the trust boundary around every satta app. Scoped to
+# the satta namespace, and deny-by-default on destinations except the
+# namespaces the platform actually owns (the same discipline as IAM).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: satta
+  namespace: argocd
+spec:
+  description: Satta iGaming platform
+  sourceRepos:
+    - https://github.com/echelonxventures-Projects/Satta.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: satta
+    - server: https://kubernetes.default.svc
+      namespace: satta-system
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ServiceAccount
+    - group: rbac.authorization.k8s.io
+      kind: Role
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding

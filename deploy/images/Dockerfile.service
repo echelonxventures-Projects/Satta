@@ -1,0 +1,42 @@
+# One Dockerfile for every Go service in the monorepo: the module is shared, so
+# a per-service COPY would duplicate the build cache for no benefit. SERVICE
+# selects the binary; everything else is uniform.
+#
+#   docker build --build-arg SERVICE=template -t satta-template:dev \
+#       -f deploy/images/Dockerfile.service .
+#
+# No HEALTHCHECK: the final image has no shell (scratch) and liveness/readiness
+# belong to Kubernetes probes (deploy/helm), not to the image.
+ARG GO_VERSION=1.26
+
+FROM golang:${GO_VERSION} AS builder
+ARG SERVICE
+WORKDIR /src
+
+# Dependency layer first: unchanged go.sum keeps the module cache across builds.
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+# Static build: no libc, so a scratch base works unchanged. netgo keeps DNS
+# in-binary; CA certs are copied explicitly so production TLS (managed Postgres,
+# OTLP over TLS) verifies without a distroless/glibc base to pull.
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
+    -ldflags '-buildid= -s -w' \
+    -o /out/service ./services/${SERVICE}
+RUN mkdir -p /out/ca && cp /etc/ssl/certs/ca-certificates.crt /out/ca/
+
+# reproducible: strip timestamps/paths so the same commit builds the same layer
+# (certification requires rebuildable builds, plan S48)
+
+FROM scratch
+ARG SERVICE
+ARG VERSION=dev
+COPY --from=builder /out/service /usr/local/bin/service
+COPY --from=builder /out/ca/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+# 65532:nonroot — no shell, no package manager, nothing to log into.
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/service"]
+LABEL org.opencontainers.image.title="satta-${SERVICE}" \
+      org.opencontainers.image.source="https://github.com/echelonxventures-Projects/Satta" \
+      org.opencontainers.image.version="${VERSION}"

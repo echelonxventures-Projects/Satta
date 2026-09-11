@@ -1,0 +1,31 @@
+# Root of the GitOps tree (ADR-0003: single-node k3s + Helm + Argo CD).
+# Argo watches exactly one pointer; everything below it is cluster state
+# declared in this repo. Applying this to a fresh cluster is the whole
+# bootstrap — there is no other imperative deploy path (DoD gate 7).
+#
+# Repo credentials for this private repository are configured at Argo install
+# time from Vault (plan S51), never committed here.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: satta-root
+  namespace: argocd
+spec:
+  project: satta
+  source:
+    repoURL: https://github.com/echelonxventures-Projects/Satta.git
+    targetRevision: main
+    path: deploy/argocd/environments/stage0
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: satta
+  syncPolicy:
+    # stage-0 auto-syncs on change but never self-heals: while the platform is
+    # pre-production, engineers hand-patching the dev box must survive long
+    # enough to be investigated — a self-healing controller erases that
+    # evidence within seconds.
+    automated:
+      prune: true
+      selfHeal: false

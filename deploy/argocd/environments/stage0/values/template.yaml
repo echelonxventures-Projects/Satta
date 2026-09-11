@@ -1,0 +1,42 @@
+# stage-0 (ADR-0002): the single dev box. Loopback-only connectivity,
+# single-node topology, no HA bindings enabled. Every deviation from chart
+# defaults here is because the box is small, never because a control was
+# deleted (ADR-0004).
+name: template
+image:
+  # Stage-0 loads images into k3s's containerd directly from `task image:build`
+  # output (see deploy/argocd/README.md), so a local tag resolves without a
+  # registry. Real environments pin a digest in their values file instead.
+  repository: satta-template
+  tag: dev
+  pullPolicy: IfNotPresent
+
+replicas: 1
+resources:
+  requests:
+    cpu: 25m
+    memory: 48Mi
+  limits:
+    memory: 256Mi
+
+# The stage-0 substrate (task up) publishes Postgres on the host loopback at
+# 55432; a pod reaches the host through the node IP. K8S_NODEIP comes from
+# the downward API and $(K8S_NODEIP) expands in the following entry — the
+# DSN's credential is the documented local dev value, never a real secret.
+env:
+  - name: K8S_NODEIP
+    valueFrom:
+      fieldRef:
+        fieldPath: status.hostIP
+  - name: DATABASE_URL
+    value: "postgres://satta_app:satta-app-dev@$(K8S_NODEIP):55432/satta?sslmode=disable"
+
+autoscaling:
+  enabled: false
+metrics:
+  serviceMonitor:
+    enabled: false
+networkPolicy:
+  enabled: false
+pdb:
+  enabled: false

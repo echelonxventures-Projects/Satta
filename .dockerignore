@@ -1,0 +1,13 @@
+.git
+.local
+.opencode
+.kiro
+deploy
+docs
+scripts
+Makefile
+Taskfile.yml
+Implementation Plan.docx
+*.md
+coverage.out
+coverage.html
