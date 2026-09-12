@@ -34,3 +34,10 @@ Append a new section at the bottom using this format:
 **Decision**: `docs/PLAN.md` v1.3 is the single living master plan (S0–S52; decisions D1–D10; open items O1/O2). Phase 0 executed: initial commit on `main`, private remote `echelonxventures-Projects/Satta`, pre-commit active, CI workflow mirroring `task ci` + govulncheck, ADR-0006 Accepted at Stage 4, ADR-0007 supersedes ADR-0002's cost mandate, ADR-0008 (GDPR erasure vs evidence) drafted Proposed.
 **Impact**: All phases — execution now proceeds per `docs/PLAN.md` sequence; next is S8 (wire-level conformance suites) before any service work.
 **Status**: Active
+
+### DECISION-003: Task 1 closed; entitlement gate forwarded to S16
+**Date**: 2026-09-11
+**Context**: Task 1 (monorepo scaffolding, local infrastructure, service template, contracts, evidence skeleton, metering SDK) completed through S13; the 10 DoD gates required a documented walk before closure.
+**Decision**: Task 1 closed per `docs/PLAN.md` v1.9. Gates 1–8 satisfied within Task 1 scope; gate 9 (capability registered as a product with entitlement check) explicitly forwarded as the exit condition of S16 — no billable capability may open before it. Gate 10's mechanism (metering SDK) is contract-tested; it binds every future billable action at its own task.
+**Impact**: Phase 1 continues at S15 (Task 2 — Temporal behind a port); S16 must ship entitlements with the rules engine.
+**Status**: Active

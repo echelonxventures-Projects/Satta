@@ -7,7 +7,7 @@ stand without asking.
 lines holding contested positions, one of which flipped twice in a single session. Decisions
 now have ADRs with Status fields. Keep this file to state.
 
-## Current Phase: Phase 1 — Foundation (Task 1 in progress)
+## Current Phase: Phase 1 — Foundation (Task 1 CLOSED v1.9; Task 2 next)
 
 ## Completed Tasks
 
@@ -45,12 +45,23 @@ now have ADRs with Status fields. Keep this file to state.
    the S8 wire adapters as RLS-bound satta_app traffic; chain verified intact
    by the independent platformctl verifier; graceful drain exercised. Two
    live-discovered bugs fixed with regression tests (RequestLog before
-   CorrelationID; slog local-time). Finder duplicate `* N.go` files cleaned
-   from the evidence package.
+    CorrelationID; slog local-time). Finder duplicate `* N.go` files cleaned
+    from the evidence package.
+ - **S13+S14 (2026-09-11, PLAN v1.9) — Task 1 CLOSED**: frontend monorepo
+   scaffold per ADR-0005 — packages/money replays the shared golden corpus
+   (BigInt minor units; corpus allocation int64s moved to JSON-string
+   transport with a lossy-input-refusing codec), packages/api-client
+   generated from proto/ by the same buf workspace as Go (drift gate
+   `task gen:check`), stage-0 app skeletons with their rules documented.
+   All 10 DoD gates walked: 1–8 satisfied for Task 1 scope; gate 9 forwarded
+   as S16's exit condition (no billable capability opens before entitlements);
+   gate 10 mechanism contract-tested, no billable actions exist yet.
 
 ## In Progress
 
-**Task 1 — Monorepo scaffolding and fully local infrastructure** (started 2026-08-01)
+**Task 2 — Workflow orchestration** (started 2026-09-11)
+
+Prior: **Task 1 — Monorepo scaffolding and fully local infrastructure** — CLOSED 2026-09-11 per `docs/PLAN.md` v1.9 (DoD 10-gate walk recorded there).
 
 Built and green (`go build ./...`, `go test ./...` both pass):
 
@@ -173,4 +184,4 @@ pre-commit 4.x (installed 2026-09-07, hooks active)
 - Update at the END of each session
 - Never remove entries from Completed Tasks — only add
 - Architectural decisions go in `docs/adr/` with a Status field, not in this file
-- Task 1 is NOT complete. Walk the 10 DoD gates before marking it so
+- Task 1 CLOSED 2026-09-11 (v1.9) after the 10-gate walk; the walk repeats per task
