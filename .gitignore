@@ -43,3 +43,13 @@ secrets.yml
 
 # Office lock/temp files
 ~$*
+
+# iCloud Desktop sync conflict copies ("name 2.ext") — they were silently
+# committing into the repo twice; ignored so git never proposes them again.
+* [0-9].go
+* [0-9].ts
+* [0-9].yml
+* [0-9].yaml
+* [0-9].md
+* [0-9].json
+* [0-9].proto
