@@ -1,0 +1,13 @@
+{
+  "name": "@satta/money",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Integer minor-unit money for the browser (ADR-0005 rule 2). Formats server-computed amounts; performs no arithmetic beyond display-safe allocation replay. Mirrors libs/go/money and MUST pass the shared golden corpus.",
+  "main": "index.ts",
+  "types": "index.ts",
+  "scripts": {
+    "test": "node --test test/golden.test.ts",
+    "typecheck": "tsc --noEmit"
+  }
+}

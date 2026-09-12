@@ -1,0 +1,7 @@
+{
+  "name": "@satta/admin-console",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Operator/admin console (Task 37). Scaffold only; see README.",
+  "type": "module"
+}

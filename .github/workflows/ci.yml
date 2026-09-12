@@ -90,3 +90,42 @@ jobs:
 
       - name: Image build + chart lint/render
         run: task ci:infra
+
+  # The frontend half (S13/ADR-0005): contracts regenerate clean and every
+  # workspace test runs — including packages/money replaying the SAME golden
+  # corpus as the Go money package (Invariant 1 into the browser).
+  apps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          # Matches the local toolchain exactly; type stripping and `--test`
+          # discovery differ across majors and CI must not diverge from
+          # `task ci:apps`.
+          node-version: '26'
+          cache: npm
+
+      - name: Install task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.52.0
+
+      - name: Install buf
+        uses: bufbuild/buf-action@v1
+        with:
+          setup-only: true
+
+      - name: Contract regeneration is drift-free; workspace tests pass
+        run: task ci:apps

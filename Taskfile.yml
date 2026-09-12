@@ -245,7 +245,10 @@ tasks:
     cmds:
       - task: tools:proto
       - rm -rf libs/go/gen
-      - cd proto && buf generate
+      # GOPATH/bin must be on PATH for buf to find the `local:` plugins; go
+      # env is a cheap call, not templated globally because {{sh}} is
+      # unavailable in the env block on this task version.
+      - 'cd proto && PATH="$(go env GOPATH)/bin:$PATH" buf generate'
       - go build ./libs/go/gen/...
 
   tools:proto:
@@ -262,6 +265,35 @@ tasks:
     dir: proto
     cmds:
       - buf breaking --against '../.git#subdir=proto'
+
+  # ---------------------------------------------------------- frontend (S13)
+
+  generate:ts:
+    desc: Generate @satta/api-client TypeScript from proto/ (same contract as Go)
+    cmds:
+      - npm install --no-audit --no-fund
+      # protoc-gen-es is an npm-local binary; GOPATH first so buf resolves
+      # both npm and Go plugins regardless of the caller's PATH.
+      - 'export PATH="$(go env GOPATH)/bin:$PATH"; cd proto && buf generate --template buf.gen.ts.yaml'
+
+  gen:check:
+    desc: Regenerate all contracts and fail if committed output drifted
+    cmds:
+      - task: generate
+      - task: generate:ts
+      - git diff --exit-code libs/go/gen packages/api-client/src/gen
+
+  npm:test:
+    desc: Run all workspace tests (money golden replay, api-client contract)
+    cmds:
+      - npm install --no-audit --no-fund
+      - npm run test --workspaces --if-present
+
+  ci:apps:
+    desc: The frontend half of CI, runnable locally in one command
+    cmds:
+      - task: gen:check
+      - task: npm:test
 
   # ------------------------------------------------------------------ aggregate
 

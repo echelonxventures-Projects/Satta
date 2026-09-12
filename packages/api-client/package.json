@@ -1,0 +1,22 @@
+{
+  "name": "@satta/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Typed API client generated from proto/ — the same contract source as the Go services (ADR-0005). Contracts are shared, not re-typed.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "node --import tsx --test test/contract.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.5.2",
+    "@connectrpc/connect": "^2.1.1",
+    "@connectrpc/connect-node": "^2.1.1"
+  },
+  "devDependencies": {
+    "@bufbuild/protoc-gen-es": "^2.5.2",
+    "tsx": "^4.23.13"
+  }
+}

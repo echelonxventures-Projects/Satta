@@ -362,94 +362,92 @@
   "allocation": [
     {
       "id": "alloc-even",
-      "amount": 1000,
+      "amount": "1000",
       "weights": [
-        1,
-        1
+        "1",
+        "1"
       ],
       "parts": [
-        500,
-        500
+        "500",
+        "500"
       ]
     },
     {
       "id": "alloc-weighted",
-      "amount": 1000,
+      "amount": "1000",
       "weights": [
-        1,
-        3
+        "1",
+        "3"
       ],
       "parts": [
-        250,
-        750
+        "250",
+        "750"
       ]
     },
     {
       "id": "alloc-remainder-to-first",
-      "amount": 1000,
+      "amount": "1000",
       "weights": [
-        1,
-        1,
-        1
+        "1",
+        "1",
+        "1"
       ],
       "parts": [
-        334,
-        333,
-        333
+        "334",
+        "333",
+        "333"
       ],
       "note": "1000/3: the waterfall gives the indivisible remainder to the first part deterministically"
     },
     {
       "id": "alloc-zero-weight",
-      "amount": 1000,
+      "amount": "1000",
       "weights": [
-        0,
-        1
+        "0",
+        "1"
       ],
       "parts": [
-        0,
-        1000
+        "0",
+        "1000"
       ]
     },
     {
       "id": "alloc-negative-amount",
-      "amount": -1000,
+      "amount": "-1000",
       "weights": [
-        1,
-        1
+        "1",
+        "1"
       ],
       "parts": [
-        -500,
-        -500
+        "-500",
+        "-500"
       ]
     },
     {
       "id": "alloc-negative-weight",
-      "amount": 1000,
+      "amount": "1000",
       "weights": [
-        -1,
-        1
+        "-1",
+        "1"
       ],
-      "parts": null,
       "error": "non-negative"
     },
     {
       "id": "alloc-no-weights",
-      "amount": 1000,
+      "amount": "1000",
       "weights": [],
-      "parts": null,
       "error": "at least one weight"
     },
     {
       "id": "alloc-maxint64",
-      "amount": 9223372036854775807,
+      "amount": "9223372036854775807",
       "weights": [
-        1,
-        1
+        "1",
+        "1"
       ],
       "parts": [
-        4611686018427387904,
-        4611686018427387903
+        "4611686018427387904",
+        "4611686018427387903"
       ],
       "note": "big.Int waterfall: MaxInt64 splits without overflow and the odd minor goes to the first part"
     }

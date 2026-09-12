@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 )
 
 // Corpus is the parsed golden vector file.
@@ -57,13 +58,64 @@ type RatioVector struct {
 
 // AllocationVector pins a full allocation waterfall, including the split
 // remainder handling that double-entry payout code depends on.
+//
+// Every int64 crosses the wire as a JSON string: values beyond 2^53 cannot
+// survive a JavaScript JSON.parse through the IEEE-754 double a bare JSON
+// number decodes to, and the max-int64 vector exists precisely to catch that
+// class of bug. This mirrors the proto3 JSON mapping, where int64 is a string
+// for the same reason.
 type AllocationVector struct {
-	ID      string  `json:"id"`
-	Amount  int64   `json:"amount"`
-	Weights []int64 `json:"weights"`
-	Parts   []int64 `json:"parts"`
-	Error   string  `json:"error,omitempty"`
-	Note    string  `json:"note,omitempty"`
+	ID      string      `json:"id"`
+	Amount  int64       `json:"amount,string"`
+	Weights BigIntSlice `json:"weights"`
+	Parts   BigIntSlice `json:"parts,omitempty"`
+	Error   string      `json:"error,omitempty"`
+	Note    string      `json:"note,omitempty"`
+}
+
+// BigIntSlice is a []int64 whose elements marshal as JSON strings.
+type BigIntSlice []int64
+
+// MarshalJSON renders each element as a string, []int64{1,-2} to ["1","-2"].
+// A nil slice renders as null, not as an empty array, so "no parts expected"
+// and "zero parts" stay distinguishable in the corpus.
+func (s BigIntSlice) MarshalJSON() ([]byte, error) {
+	if s == nil {
+		return []byte("null"), nil
+	}
+	var buf bytes.Buffer
+	buf.WriteByte('[')
+	for i, v := range s {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		fmt.Fprintf(&buf, "%q", strconv.FormatInt(v, 10))
+	}
+	buf.WriteByte(']')
+	return buf.Bytes(), nil
+}
+
+// UnmarshalJSON accepts string elements and rejects bare numbers: a consumer
+// that emits numbers here has silently reintroduced the precision hazard.
+func (s *BigIntSlice) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		*s = nil
+		return nil
+	}
+	var strs []string
+	if err := json.Unmarshal(data, &strs); err != nil {
+		return fmt.Errorf("golden: allocation int64s must be JSON strings: %w", err)
+	}
+	out := make(BigIntSlice, 0, len(strs))
+	for _, str := range strs {
+		v, err := strconv.ParseInt(str, 10, 64)
+		if err != nil {
+			return fmt.Errorf("golden: bad int64 %q: %w", str, err)
+		}
+		out = append(out, v)
+	}
+	*s = out
+	return nil
 }
 
 // PreimageVector pins the canonical payload encoding: the exact bytes and
