@@ -100,6 +100,15 @@ repos:
         pass_filenames: false
         always_run: true
 
+      - id: no-conflict-copies
+        name: no iCloud conflict copies
+        # "name 2.ext" files from iCloud Desktop sync have twice sneaked real
+        # duplicates of source into commits. Absent == passing.
+        entry: bash -c 'dups=$(find . -type f \( -name "* [0-9].go" -o -name "* [0-9].ts" -o -name "* [0-9].yml" -o -name "* [0-9].yaml" -o -name "* [0-9].md" -o -name "* [0-9].json" -o -name "* [0-9].proto" \) -not -path "./.git/*" -not -path "*/node_modules/*" -not -path "./.local/*"); if [ -n "$dups" ]; then echo "iCloud conflict copies present — delete them:"; echo "$dups"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
       - id: steering-state-reminder
         name: implementation state is current
         entry: ./scripts/check-state-freshness.sh
