@@ -1,0 +1,18 @@
+{
+  "name": "satta",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Satta platform frontend monorepo (ADR-0005): thin apps, fat shared packages.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "npm run --workspaces --if-present typecheck",
+    "test": "npm run --workspaces --if-present test",
+    "build": "npm run --workspaces --if-present build"
+  }
+}

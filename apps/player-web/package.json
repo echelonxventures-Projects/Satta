@@ -1,0 +1,7 @@
+{
+  "name": "@satta/player-web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Player PWA (Task 32). Scaffold only: no product surface exists until the services behind it do (M1+).",
+  "type": "module"
+}

@@ -1,0 +1,14 @@
+# TS codegen: same proto/ source, different language. Generated into
+# packages/api-client/src/gen — never hand-edited (DoD gate 6: consumers must
+# not break on deploy; regenerating is the only update path).
+version: v2
+managed:
+  enabled: true
+plugins:
+  # Local plugin; npm workspaces hoist it to the repo root's node_modules.
+  - local: ../node_modules/.bin/protoc-gen-es
+    out: ../packages/api-client/src/gen
+    opt:
+      - target=ts
+inputs:
+  - directory: .
