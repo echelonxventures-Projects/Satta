@@ -169,15 +169,24 @@ pre-commit 4.x (installed 2026-09-07, hooks active)
  6. ~~S12 Go service template~~ — done 2026-09-11 (v1.8): observability,
     httpx, bootstrap, template live with M1 proof (chain intact via platformctl,
     graceful drain exercised); 2 live bugs fixed with regression tests
- 7. S4a — Deployment pipeline: per-service Dockerfile + Helm chart + Argo CD,
-    first bound to the S12 template (deployability proven at M1)
- 8. S13 — `apps/` + `packages/` scaffold + generated api-client (ADR-0005)
- 9. S14 — walk the 10 DoD gates and close Task 1
- 10. Then S15 (Task 2 Temporal port), S16 (Task 3 config/rules engine +
-     jurisdiction→entity routing), S17 (Task 4 scheduler), S18 (Task 5 test
-     data), S19 (Task 6 IAM)
+  7. ~~S4a deployment pipeline~~ — done (v1.9/v1.10): image (run-verified),
+     generic Helm chart w/ ADR-0004 bindings, Argo root/project/stage0,
+     `task ci:infra` + CI job
+  8. ~~S13 frontend scaffold~~, ~~S14 Task 1 close~~ — done (v1.9):
+     packages/money golden-replay, api-client generated from proto + drift
+     gate; 10-gate walk recorded
+  9. ~~S15 Task 2 (Temporal port)~~ — done (v1.10); ~~S16 Task 3~~ +
+     ~~S17 Task 4~~ + ~~S18 Task 5~~ — done (v1.11/v1.12); S19 Task 6 —
+     foundation done (access: RBAC/ABAC + API keys, v1.12); OIDC/sessions/MFA
+     remain, service-level
+ 10. S22 ◐ (v1.13): ledger core + 9-scenario contract suite merged;
+     remaining: Postgres ledger binding, multi-wallet distribution,
+     player-funds segregation (G5) — then S23 FX, S24 financial engine,
+     S25/S26 payments & withdrawals, compliance phases
 
-**Master sequence:** `docs/PLAN.md` (S0–S52, in execution; Phase 0 and S8–S12 complete).
+**Master sequence:** `docs/PLAN.md` (S0–S52, in execution; Phase 0 closed,
+Phase 1 closed except Task 6 transport halves, Phase 2 opened with the ledger
+core).
 
 ## Notes
 
