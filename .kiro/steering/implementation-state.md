@@ -179,10 +179,13 @@ pre-commit 4.x (installed 2026-09-07, hooks active)
      ~~S17 Task 4~~ + ~~S18 Task 5~~ — done (v1.11/v1.12); S19 Task 6 —
      foundation done (access: RBAC/ABAC + API keys, v1.12); OIDC/sessions/MFA
      remain, service-level
- 10. S22 ◐ (v1.13): ledger core + 9-scenario contract suite merged;
-     remaining: Postgres ledger binding, multi-wallet distribution,
-     player-funds segregation (G5) — then S23 FX, S24 financial engine,
-     S25/S26 payments & withdrawals, compliance phases
+ 10. S22-S26 ☑ (v1.13-v1.18): ledger core + Postgres binding + wallets
+     (Task 7), fx (Task 8), fin engine (Task 9), deposits (Task 10),
+     payouts with reconcile-before-release (Task 11) — engine cores
+     CLOSED; vendor PSP/KYC adapters + HTTP/gRPC endpoints land
+     service-side with the owning services
+ 11. Next: Phase 3 — S29 KYC, S30 RG, S31 AML, S32 SIEM, S33 realtime;
+     Task 6 transport halves (OIDC/sessions/MFA) ride the IAM service
 
 **Master sequence:** `docs/PLAN.md` (S0–S52, in execution; Phase 0 closed,
 Phase 1 closed except Task 6 transport halves, Phase 2 opened with the ledger
