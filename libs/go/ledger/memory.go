@@ -49,13 +49,23 @@ func memKey(scope tenancy.Scope, idem string) string {
 	return scope.TenantID + "|" + idem
 }
 
-// OpenAccount implements Ledger.
-func (m *MemoryLedger) OpenAccount(_ context.Context, acct Account) error {
+// OpenAccount implements Ledger. The caller's tenant (from context) is the
+// opening authority: posting under a mismatched acct.Scope is rejected, so a
+// tenant cannot conjure accounts in someone else's book.
+func (m *MemoryLedger) OpenAccount(ctx context.Context, acct Account) error {
+	scope, err := tenancy.RequireFromContext(ctx)
+	if err != nil {
+		return err
+	}
 	if acct.ID == "" || acct.Currency.IsZero() {
 		return errors.New("ledger: account needs an ID and a currency")
 	}
 	if err := acct.Scope.Validate(); err != nil {
 		return err
+	}
+	if acct.Scope.TenantID != scope.TenantID {
+		return fmt.Errorf("%w: opening account for tenant %q as tenant %q",
+			tenancy.ErrScopeMismatch, acct.Scope.TenantID, scope.TenantID)
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -153,8 +163,12 @@ func refusesNegative(k Kind) bool {
 }
 
 // Balance derives an account's balance from the (incrementally maintained)
-// posting projections.
-func (m *MemoryLedger) Balance(_ context.Context, accountID string) (money.Amount, error) {
+// posting projections. Deny-by-default on scope, exactly like the durable
+// binding: an unscoped read must not answer, in any implementation.
+func (m *MemoryLedger) Balance(ctx context.Context, accountID string) (money.Amount, error) {
+	if _, err := tenancy.RequireFromContext(ctx); err != nil {
+		return money.Amount{}, err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	amt, ok := m.dirty[accountID]
@@ -165,7 +179,10 @@ func (m *MemoryLedger) Balance(_ context.Context, accountID string) (money.Amoun
 }
 
 // Entry implements Ledger.
-func (m *MemoryLedger) Entry(_ context.Context, id string) (Entry, error) {
+func (m *MemoryLedger) Entry(ctx context.Context, id string) (Entry, error) {
+	if _, err := tenancy.RequireFromContext(ctx); err != nil {
+		return Entry{}, err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, e := range m.entries {

@@ -23,6 +23,9 @@ var AppendOnlyTables = []string{
 	"evidence_record",
 	"evidence_checkpoint",
 	"usage_event",
+	"ledger_account",
+	"ledger_entry",
+	"ledger_posting",
 }
 
 // MutableTables carry state that legitimately changes — a chain head pointer
