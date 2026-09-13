@@ -188,3 +188,54 @@ func TestSingleLiveJourneyPerPlayer(t *testing.T) {
 		t.Fatalf("second Start minted a new case: %s vs %s", second.ID, first.ID)
 	}
 }
+
+type fakeAgeGate struct{ adult bool }
+
+func (f *fakeAgeGate) Name() string { return "age-co" }
+
+func (f *fakeAgeGate) CheckAge(context.Context, string, string, int) (kyc.AgeDecision, error) {
+	return kyc.AgeDecision{Adult: f.adult}, nil
+}
+
+func TestAgeGateSeparateFromVerification(t *testing.T) {
+	svc, _, ctx := harness(t)
+	st := kyc.NewMemoryAgeStore()
+
+	// Minor refused at 18 even though nothing about KYC says so.
+	d, err := svc.VerifyAge(ctx, &fakeAgeGate{adult: false}, st, "kid", "mt", 18)
+	if !errors.Is(err, kyc.ErrMinor) || d.Adult {
+		t.Fatalf("minor: %v %+v, want ErrMinor", err, d)
+	}
+	// Adult passes and the decision is reused (gate called once).
+	calls := 0
+	gate := ageCounter{adult: true, calls: &calls}
+	d, err = svc.VerifyAge(ctx, &gate, st, "grown", "mt", 18)
+	if err != nil || !d.Adult {
+		t.Fatalf("adult: %v %+v", err, d)
+	}
+	if _, err := svc.VerifyAge(ctx, &gate, st, "grown", "mt", 18); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("gate called %d times, want 1 (passed check reused)", calls)
+	}
+	// A different jurisdiction band is its own decision.
+	if _, err := svc.VerifyAge(ctx, &gate, st, "grown", "us", 21); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("band change must re-check: %d", calls)
+	}
+}
+
+type ageCounter struct {
+	adult bool
+	calls *int
+}
+
+func (a *ageCounter) Name() string { return "age-co" }
+
+func (a *ageCounter) CheckAge(context.Context, string, string, int) (kyc.AgeDecision, error) {
+	*a.calls++
+	return kyc.AgeDecision{Adult: a.adult}, nil
+}
