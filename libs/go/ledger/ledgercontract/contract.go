@@ -72,10 +72,10 @@ func RunContractTests(t *testing.T, newLedger Factory) {
 			t.Fatalf("post: %v", perr)
 		}
 
-		if b := bal(t, l, "cash-a"); b.Minor() != 6000 {
+		if b := bal(ctx, t, l, "cash-a"); b.Minor() != 6000 {
 			t.Fatalf("cash-a = %d, want 6000", b.Minor())
 		}
-		if b := bal(t, l, "cash-b"); b.Minor() != 4000 {
+		if b := bal(ctx, t, l, "cash-b"); b.Minor() != 4000 {
 			t.Fatalf("cash-b = %d, want 4000", b.Minor())
 		}
 	})
@@ -114,7 +114,7 @@ func RunContractTests(t *testing.T, newLedger Factory) {
 		if e2.ID != e1.ID {
 			t.Fatalf("repeat returned %s, want the original %s", e2.ID, e1.ID)
 		}
-		if b := bal(t, l, "cash-a"); b.Minor() != 4000 {
+		if b := bal(ctx, t, l, "cash-a"); b.Minor() != 4000 {
 			t.Fatalf("cash-a = %d after duplicate post, want 4000 — money left twice", b.Minor())
 		}
 	})
@@ -210,9 +210,9 @@ func must(t *testing.T, err error) {
 	}
 }
 
-func bal(t *testing.T, l ledger.Ledger, accountID string) money.Amount {
+func bal(ctx context.Context, t *testing.T, l ledger.Ledger, accountID string) money.Amount {
 	t.Helper()
-	a, err := l.Balance(context.Background(), accountID)
+	a, err := l.Balance(ctx, accountID)
 	if err != nil {
 		t.Fatalf("balance %s: %v", accountID, err)
 	}

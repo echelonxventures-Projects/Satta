@@ -10,6 +10,7 @@ import (
 
 	"github.com/satta/platform/libs/go/db"
 	"github.com/satta/platform/libs/go/evidence"
+	"github.com/satta/platform/libs/go/ledger"
 	"github.com/satta/platform/libs/go/metering"
 
 	"github.com/jackc/pgx/v5"
@@ -30,9 +31,11 @@ type schemaOwner struct {
 func schemaOwners() []schemaOwner {
 	evidenceFS, evidenceDir := evidence.Migrations()
 	meteringFS, meteringDir := metering.Migrations()
+	ledgerFS, ledgerDir := ledger.Migrations()
 	return []schemaOwner{
 		{name: "evidence", fsys: evidenceFS, dir: evidenceDir},
 		{name: "metering", fsys: meteringFS, dir: meteringDir},
+		{name: "ledger", fsys: ledgerFS, dir: ledgerDir},
 	}
 }
 
