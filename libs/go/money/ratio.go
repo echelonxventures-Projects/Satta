@@ -107,6 +107,37 @@ func (r Ratio) IsZero() bool { return r.num == 0 }
 
 func (r Ratio) String() string { return fmt.Sprintf("%d/%d", r.num, r.den) }
 
+// Cmp orders two ratios by cross-multiplication — exact, never a float
+// division. Cross-products can exceed int64, so they are taken in big.Int
+// (permitted intermediate math; the result is an ordering, not money).
+func (r Ratio) Cmp(o Ratio) int {
+	l := new(big.Int).Mul(big.NewInt(r.num), big.NewInt(o.den))
+	rr := new(big.Int).Mul(big.NewInt(o.num), big.NewInt(r.den))
+	return l.Cmp(rr)
+}
+
+// Invert returns den/num — the reciprocal, used to price the reverse leg of
+// a pair from a forward quote. A zero numerator has no reciprocal; the
+// caller's rate becomes an explicit error instead of an infinite ratio.
+func (r Ratio) Invert() (Ratio, error) {
+	if r.num == 0 {
+		return Ratio{}, fmt.Errorf("%w: cannot invert %s", ErrInvalidRatio, r.String())
+	}
+	return NewRatio(r.den, r.num)
+}
+
+// Mul returns r*o exactly (fraction multiplication, no rounding). The
+// product is checked for int64 representability and rejected, never clamped:
+// a rate whose product overflows is a configuration bug, not a value.
+func (r Ratio) Mul(o Ratio) (Ratio, error) {
+	num := new(big.Int).Mul(big.NewInt(r.num), big.NewInt(o.num))
+	den := new(big.Int).Mul(big.NewInt(r.den), big.NewInt(o.den))
+	if !num.IsInt64() || !den.IsInt64() {
+		return Ratio{}, fmt.Errorf("%w: %s * %s exceeds int64 range", ErrInvalidRatio, r.String(), o.String())
+	}
+	return NewRatio(num.Int64(), den.Int64())
+}
+
 // ParseRatioPercent converts a percentage expressed as an exact decimal string
 // (for example "2.5" for two and a half percent) into a Ratio. It exists so
 // that configured percentages never pass through a float on their way into
